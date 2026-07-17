@@ -1,0 +1,114 @@
+# SPDX-License-Identifier: GPL-2.0-only
+name: Build GetBible Study APIs v1
+
+on:
+  schedule:
+    - cron: "12 4 1 * *"
+  workflow_dispatch:
+    inputs:
+      resource:
+        description: API repository to build
+        required: true
+        default: all
+        type: choice
+        options: [all, commentaries, dictionaries]
+      refresh:
+        description: Redownload the CrossWire catalog and module packages
+        required: true
+        default: false
+        type: boolean
+      push:
+        description: Publish when every publication secret is configured
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: study-builder-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Checkout Study Builder
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Study Builder
+        run: python -m pip install .
+      - name: Resolve publication mode
+        id: publication
+        shell: bash
+        env:
+          PUSH_REQUESTED: ${{ github.event_name == 'schedule' && 'true' || inputs.push }}
+          GIT_USER: ${{ secrets.GETBIBLE_GIT_USER }}
+          GIT_EMAIL: ${{ secrets.GETBIBLE_GIT_EMAIL }}
+          GPG_KEY: ${{ secrets.GETBIBLE_GPG_KEY }}
+          GPG_USER: ${{ secrets.GETBIBLE_GPG_USER }}
+          SSH_KEY: ${{ secrets.GETBIBLE_SSH_KEY }}
+          SSH_PUB: ${{ secrets.GETBIBLE_SSH_PUB }}
+        run: |
+          enabled=false
+          missing=()
+          for name in GIT_USER GIT_EMAIL GPG_KEY GPG_USER SSH_KEY SSH_PUB; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if [[ "$PUSH_REQUESTED" == "true" && ${#missing[@]} -eq 0 ]]; then
+            enabled=true
+          elif [[ "$PUSH_REQUESTED" != "true" ]]; then
+            echo "::notice::Publication was disabled for this run; the complete local build will continue."
+          else
+            echo "::notice::Publication secrets are incomplete (${missing[*]}); the complete local build will continue without a push."
+          fi
+          printf 'enabled=%s\n' "$enabled" >> "$GITHUB_OUTPUT"
+      - name: Set up signed Git publication
+        if: steps.publication.outputs.enabled == 'true'
+        uses: octoleo/git-user@467d99df51e136ec37d9fcb8eb1b6ba882eca6e7 # v2
+        with:
+          gpg-key: ${{ secrets.GETBIBLE_GPG_KEY }}
+          gpg-user: ${{ secrets.GETBIBLE_GPG_USER }}
+          ssh-key: ${{ secrets.GETBIBLE_SSH_KEY }}
+          ssh-pub: ${{ secrets.GETBIBLE_SSH_PUB }}
+          git-user: ${{ secrets.GETBIBLE_GIT_USER }}
+          git-email: ${{ secrets.GETBIBLE_GIT_EMAIL }}
+      - name: Install pinned getbiblesword release
+        env:
+          GETBIBLESWORD_TOKEN: ${{ secrets.GETBIBLESWORD_TOKEN }}
+        run: study-builder engine install
+      - name: Build static APIs and conditionally publish
+        env:
+          RESOURCE: ${{ github.event_name == 'schedule' && 'all' || inputs.resource }}
+          REFRESH: ${{ github.event_name == 'workflow_dispatch' && inputs.refresh || 'false' }}
+          PUBLISH: ${{ steps.publication.outputs.enabled }}
+          GETBIBLESWORD_TOKEN: ${{ secrets.GETBIBLESWORD_TOKEN }}
+          STUDY_BUILDER_COMMENTARIES_REPO: ${{ secrets.GETBIBLE_COMMENTARIES_REPO || 'git@github.com:getbible/v1_commentaries.git' }}
+          STUDY_BUILDER_DICTIONARIES_REPO: ${{ secrets.GETBIBLE_DICTIONARIES_REPO || 'git@github.com:getbible/v1_dictionaries.git' }}
+          STUDY_BUILDER_SIGN_COMMITS: ${{ steps.publication.outputs.enabled }}
+        shell: bash
+        run: |
+          args=(build --resource "$RESOURCE")
+          if [[ "$REFRESH" == "true" ]]; then
+            args+=(--refresh)
+          fi
+          if [[ "$PUBLISH" == "true" ]]; then
+            args+=(--pull --push)
+          fi
+          study-builder "${args[@]}"
+      - name: Upload build report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: study-builder-report-${{ github.run_id }}
+          path: .work/reports/latest.json
+          if-no-files-found: warn
+          retention-days: 30

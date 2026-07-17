@@ -1,0 +1,18 @@
+GetBible Study Builder is licensed under the GNU General Public License,
+version 2 only (GPL-2.0-only).
+
+Copyright (C) 2026 GetBible
+
+You may copy, modify, and distribute this program under the terms of version 2
+of the GNU General Public License as published by the Free Software Foundation.
+This program is distributed without any warranty; without even the implied
+warranty of merchantability or fitness for a particular purpose.
+
+The complete license text is included in the COPYING file and is also available
+at https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt.
+
+SPDX-License-Identifier: GPL-2.0-only
+
+CrossWire SWORD modules are separate works and retain their own licenses. A
+module being downloadable does not by itself grant permission to republish a
+converted copy. The build policy is intentionally fail-closed.

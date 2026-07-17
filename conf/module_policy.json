@@ -1,0 +1,16 @@
+{
+  "policy_version": 1,
+  "mode": "fail-closed",
+  "approved_license_values": [
+    "Public Domain",
+    "Creative Commons: CC0",
+    "Creative Commons: CC0 1.0 Universal",
+    "Creative Commons: Attribution 4.0 International",
+    "Creative Commons: BY 4.0"
+  ],
+  "approved_modules": {},
+  "denied_modules": {
+    "NETnotesfree": "The module license prohibits decomposition, reconstruction, and rehosting."
+  }
+}
+

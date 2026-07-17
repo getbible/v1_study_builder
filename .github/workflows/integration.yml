@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: GPL-2.0-only
+name: CrossWire Integration Corpus
+
+on:
+  schedule:
+    - cron: "27 3 15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  access:
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.token.outputs.enabled }}
+    steps:
+      - name: Detect private release access
+        id: token
+        shell: bash
+        env:
+          GETBIBLESWORD_TOKEN: ${{ secrets.GETBIBLESWORD_TOKEN }}
+        run: |
+          if [[ -n "$GETBIBLESWORD_TOKEN" ]]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::GETBIBLESWORD_TOKEN is not configured; live CrossWire integration jobs are skipped.'
+          fi
+
+  module:
+    needs: access
+    if: needs.access.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - resource: commentaries
+            module: Clarke
+          - resource: commentaries
+            module: TSK
+          - resource: commentaries
+            module: MHCC
+          - resource: dictionaries
+            module: StrongsGreek
+          - resource: dictionaries
+            module: StrongsHebrew
+          - resource: dictionaries
+            module: Easton
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Study Builder and pinned extractor
+        env:
+          GETBIBLESWORD_TOKEN: ${{ secrets.GETBIBLESWORD_TOKEN }}
+        run: |
+          python -m pip install .
+          study-builder engine install
+      - name: Build representative module
+        env:
+          GETBIBLESWORD_TOKEN: ${{ secrets.GETBIBLESWORD_TOKEN }}
+        run: >-
+          study-builder build
+          --resource "${{ matrix.resource }}"
+          --module "${{ matrix.module }}"
+          --refresh
+      - name: Verify generated API linkage and shape
+        run: >-
+          python scripts/validate_build.py
+          --resource "${{ matrix.resource }}"
+          --module "${{ matrix.module }}"
+      - name: Upload representative static JSON
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.resource }}-${{ matrix.module }}-${{ github.run_id }}
+          path: |
+            dist/
+            .work/reports/latest.json
+          retention-days: 7
