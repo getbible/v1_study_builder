@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
-name: GetBibleSword
+name: Get Bible Sword
 
 on:
   push:
