@@ -19,9 +19,9 @@ Add these Actions secrets to `v1_study_builder`:
 | `GETBIBLE_GPG_USER` | Signing-key identity |
 | `GETBIBLE_SSH_KEY` | Deploy key/private key with write access to both targets |
 | `GETBIBLE_SSH_PUB` | Matching public key |
-| `GETBIBLESWORD_TOKEN` | Fine-grained token with Contents: read access to the private `getbible/getbiblesword` release |
 
-The default target URLs are already compiled into the CLI. Set the optional
+The public `getbible/getbiblesword` release requires no Actions secret. The
+default target URLs are already compiled into the CLI. Set the optional
 `GETBIBLE_COMMENTARIES_REPO` and `GETBIBLE_DICTIONARIES_REPO` secrets only when
 using forks, staging repositories, or non-GitHub remotes.
 
