@@ -30,7 +30,7 @@ subprocess dependency.
 
 ## Extraction dependency
 
-`conf/getbiblesword.json` pins release `v0.1.0`, contract
+`conf/getbiblesword.json` pins release `v0.1.1`, contract
 `getbiblesword.ndjson/v1`, and the exact x86-64/ARM64 Linux asset names. On first
 use the builder:
 
@@ -38,7 +38,7 @@ use the builder:
 2. downloads its architecture-specific archive and `.sha256` sidecar;
 3. verifies the archive checksum and safely extracts only `usr/bin/getbiblesword`;
 4. checks the executable's reported version and contract;
-5. caches it under `.work/tools/getbiblesword/0.1.0/`.
+5. caches it under `.work/tools/getbiblesword/0.1.1/`.
 
 The `getbible/getbiblesword` repository and its pinned release are public, so
 installation requires no repository token. The automated smoke, integration, and
@@ -133,6 +133,14 @@ Greek keys use `G` plus the unpadded number; Hebrew keys use `H0` plus the
 unpadded number. Other dictionary keys receive deterministic, path-safe IDs.
 `keys.json` maps source keys and aliases, while 256 SHA-256-prefix shards provide
 smaller lookup indexes for constrained clients.
+
+Some SWORD dictionaries legitimately contain more than one definition for the
+same public key. The first definition keeps the canonical direct path, and later
+definitions receive deterministic `--2`, `--3`, and subsequent suffixes. For
+example, Easton's repeated `KADESH` records are available as `k-KADESH.json` and
+`k-KADESH--2.json`. Every definition appears in `keys.json` with an `occurrence`
+value. Dictionary metadata reports both the total `entry_count` and the distinct
+`unique_key_count`.
 
 ## Build flow
 

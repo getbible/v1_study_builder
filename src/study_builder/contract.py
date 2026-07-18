@@ -279,6 +279,7 @@ class GetBibleSwordContractReader:
             len(completed_artifacts),
             artifact_bytes,
             diagnostic_counts,
+            diagnostics,
         )
         metadata = self._adapt_module(module, configuration)
         metadata["_getbiblesword_header"] = header
@@ -345,6 +346,7 @@ class GetBibleSwordContractReader:
         artifacts: int,
         artifact_bytes: int,
         diagnostic_counts: Counter[str],
+        diagnostics: list[dict[str, Any]],
     ) -> None:
         expected_hash = footer.get("stream_sha256")
         if not isinstance(expected_hash, str) or not hmac.compare_digest(
@@ -365,6 +367,16 @@ class GetBibleSwordContractReader:
         if footer.get("diagnostics") != expected_diagnostics:
             raise ContractError("getbiblesword footer diagnostic counts do not match")
         if diagnostic_counts.get("error", 0):
-            raise ContractError("getbiblesword emitted an error diagnostic")
+            errors = [item for item in diagnostics if item.get("severity") == "error"]
+            summaries = []
+            for item in errors[:3]:
+                code = str(item.get("code") or "unknown")
+                message = str(item.get("message_text") or "No diagnostic message")
+                summaries.append(f"{code}: {message[:500]}")
+            remainder = len(errors) - len(summaries)
+            suffix = f"; plus {remainder} more" if remainder > 0 else ""
+            raise ContractError(
+                "getbiblesword emitted an error diagnostic: " + "; ".join(summaries) + suffix
+            )
         if footer.get("success") is not True:
             raise ContractError("getbiblesword reported an unsuccessful extraction")

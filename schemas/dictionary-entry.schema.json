@@ -3,13 +3,14 @@
   "$id": "https://dictionaries.getbible.net/schema/v1/dictionary-entry.json",
   "title": "GetBible Dictionary Entry v1",
   "type": "object",
-  "required": ["schema", "dictionary", "language", "id", "key", "aliases", "text"],
+  "required": ["schema", "dictionary", "language", "id", "key", "occurrence", "aliases", "text"],
   "properties": {
     "schema": {"const": "getbible-dictionary-entry-v1"},
     "dictionary": {"type": "string", "minLength": 1},
     "language": {"type": "string", "minLength": 2},
     "id": {"type": "string", "minLength": 1},
     "key": {"type": "string", "minLength": 1},
+    "occurrence": {"type": "integer", "minimum": 1},
     "aliases": {"type": "array", "items": {"type": "string"}, "minItems": 1},
     "text": {"type": "string"},
     "html": {"type": "string"},
@@ -17,4 +18,3 @@
   },
   "additionalProperties": false
 }
-

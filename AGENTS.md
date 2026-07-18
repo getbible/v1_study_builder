@@ -38,6 +38,9 @@ artifact, unsupported major contract, or extractor error blocks all publication.
 Commentary files remain addressable by GetBible book number and chapter. Dictionary
 Strong's keys remain compatible with Bible API v3 (`G3056`, `H0430`). Any breaking
 path or document change requires a new API version; do not silently mutate v1.
+Repeated dictionary keys retain the unsuffixed direct path for their first
+definition; later definitions use deterministic `--2`, `--3`, and subsequent
+suffixes and must all remain discoverable through `keys.json`.
 
 Generated repositories are replace-only outputs. A partial `--module` build may be
 used for tests but must never be pushed.

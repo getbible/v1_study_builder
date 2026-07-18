@@ -10,11 +10,11 @@ from study_builder.engine import EngineManifest, GetBibleSwordManager
 
 def test_manifest_pins_release_and_architectures(project_root: Path, monkeypatch) -> None:
     manifest = EngineManifest.load(project_root / "conf/getbiblesword.json")
-    assert manifest.version == "0.1.0"
-    assert manifest.tag == "v0.1.0"
+    assert manifest.version == "0.1.1"
+    assert manifest.tag == "v0.1.1"
     monkeypatch.setattr("study_builder.engine.platform.system", lambda: "Linux")
     monkeypatch.setattr("study_builder.engine.platform.machine", lambda: "x86_64")
-    assert manifest.platform_asset() == "getbiblesword-0.1.0-linux-x86_64.tar.gz"
+    assert manifest.platform_asset() == "getbiblesword-0.1.1-linux-x86_64.tar.gz"
 
 
 def test_checksum_sidecar_must_name_exact_asset(tmp_path: Path) -> None:

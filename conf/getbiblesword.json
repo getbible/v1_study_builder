@@ -1,10 +1,10 @@
 {
   "repository": "getbible/getbiblesword",
-  "version": "0.1.0",
-  "tag": "v0.1.0",
+  "version": "0.1.1",
+  "tag": "v0.1.1",
   "contract": "getbiblesword.ndjson/v1",
   "assets": {
-    "linux-x86_64": "getbiblesword-0.1.0-linux-x86_64.tar.gz",
-    "linux-arm64": "getbiblesword-0.1.0-linux-arm64.tar.gz"
+    "linux-x86_64": "getbiblesword-0.1.1-linux-x86_64.tar.gz",
+    "linux-arm64": "getbiblesword-0.1.1-linux-arm64.tar.gz"
   }
 }

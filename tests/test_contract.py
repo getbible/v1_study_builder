@@ -198,5 +198,6 @@ def test_rejects_error_diagnostic_even_with_success_footer(
             "type": "diagnostic",
         }
     )
-    with pytest.raises(ContractError, match="error diagnostic"):
+    with pytest.raises(ContractError, match="error diagnostic") as captured:
         reader.read(io.BytesIO(stream(records)))
+    assert "synthetic.error: Synthetic failure" in str(captured.value)

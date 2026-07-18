@@ -63,6 +63,7 @@ class DictionaryWriter:
         key_index: list[dict[str, Any]] = []
         shards: dict[str, list[dict[str, Any]]] = defaultdict(list)
         used_ids: dict[str, str] = {}
+        occurrences: dict[str, int] = defaultdict(int)
 
         ordered_entries = sorted(
             exported.entries, key=lambda entry: str(entry.get("key", "")).casefold()
@@ -79,6 +80,11 @@ class DictionaryWriter:
             collision_key = entry_id.casefold()
             if collision_key in used_ids and used_ids[collision_key] != key:
                 entry_id = "h-" + hashlib.sha256(key.encode("utf-8")).hexdigest()
+                collision_key = entry_id.casefold()
+            occurrences[collision_key] += 1
+            occurrence = occurrences[collision_key]
+            if occurrence > 1:
+                entry_id = f"{entry_id}--{occurrence}"
             used_ids[entry_id.casefold()] = key
             aliases = sorted({value for value in (key, canonical) if value})
             raw = str(source.get("raw", ""))
@@ -89,6 +95,7 @@ class DictionaryWriter:
                 "language": module.language,
                 "id": entry_id,
                 "key": key,
+                "occurrence": occurrence,
                 "aliases": aliases,
                 **content,
             }
@@ -100,6 +107,7 @@ class DictionaryWriter:
             index_record = {
                 "key": key,
                 "id": entry_id,
+                "occurrence": occurrence,
                 "aliases": aliases,
                 "url": f"{entry_id}.json",
             }
@@ -121,6 +129,7 @@ class DictionaryWriter:
             "driver": module.driver,
             "source_type": module.first("sourcetype"),
             "entry_count": len(key_index),
+            "unique_key_count": len({record["key"].casefold() for record in key_index}),
             "strong_prefix": prefix,
             "keys_url": "keys.json",
             "entry_url_template": "{entry}.json",
