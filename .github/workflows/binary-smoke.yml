@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
-name: Public getBibleSword Binary Smoke
+name: GetBibleSword
 
 on:
   push:

@@ -1,7 +1,14 @@
 # SPDX-License-Identifier: GPL-2.0-only
-name: CrossWire Integration Corpus
+name: CrossWire Corpus
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/integration.yml"
+      - "conf/getbiblesword.json"
+      - "src/study_builder/engine.py"
+      - "src/study_builder/http.py"
   schedule:
     - cron: "27 3 15 * *"
   workflow_dispatch:

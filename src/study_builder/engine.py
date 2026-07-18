@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import platform
 import re
 import subprocess
@@ -11,13 +10,20 @@ import tarfile
 import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
 
 from study_builder.http import HttpClient
 from study_builder.util import read_json
 
-_CHECKSUM = re.compile(r"^([0-9a-fA-F]{64})[ \t]+[*]?([^\r\n]+)$")
+_DIGEST = re.compile(r"^[0-9a-fA-F]{64}$")
+_REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_ASSET_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _MAX_BINARY_BYTES = 512 * 1024 * 1024
+
+
+@dataclass(frozen=True)
+class EngineAsset:
+    name: str
+    sha256: str
 
 
 @dataclass(frozen=True)
@@ -26,7 +32,7 @@ class EngineManifest:
     version: str
     tag: str
     contract: str
-    assets: dict[str, str]
+    assets: dict[str, EngineAsset]
 
     @classmethod
     def load(cls, path: Path) -> EngineManifest:
@@ -41,16 +47,29 @@ class EngineManifest:
             raise ValueError("getbiblesword version must be semantic")
         if tag != f"v{version}":
             raise ValueError("getbiblesword tag must match its pinned version")
-        assets = {str(key): str(name) for key, name in dict(value["assets"]).items()}
+        repository = str(value["repository"])
+        if not _REPOSITORY.fullmatch(repository):
+            raise ValueError("getbiblesword repository must be an owner/name pair")
+        assets: dict[str, EngineAsset] = {}
+        for key, raw_asset in dict(value["assets"]).items():
+            if not isinstance(raw_asset, dict):
+                raise ValueError(f"getbiblesword asset {key} must pin a name and SHA-256")
+            name = str(raw_asset.get("name", ""))
+            sha256 = str(raw_asset.get("sha256", "")).casefold()
+            if not _ASSET_NAME.fullmatch(name):
+                raise ValueError(f"getbiblesword asset {key} has an invalid filename")
+            if not _DIGEST.fullmatch(sha256):
+                raise ValueError(f"getbiblesword asset {key} has an invalid SHA-256")
+            assets[str(key)] = EngineAsset(name=name, sha256=sha256)
         return cls(
-            repository=str(value["repository"]),
+            repository=repository,
             version=version,
             tag=tag,
             contract=str(value["contract"]),
             assets=assets,
         )
 
-    def platform_asset(self) -> str:
+    def platform_asset(self) -> EngineAsset:
         if platform.system().casefold() != "linux":
             raise RuntimeError("The pinned getbiblesword release currently supports Linux only")
         machine = platform.machine().casefold()
@@ -68,6 +87,9 @@ class EngineManifest:
         except KeyError as error:
             raise RuntimeError(f"No pinned getbiblesword release asset for {key}") from error
 
+    def asset_url(self, asset: EngineAsset) -> str:
+        return f"https://github.com/{self.repository}/releases/download/{self.tag}/{asset.name}"
+
 
 class GetBibleSwordManager:
     def __init__(
@@ -75,20 +97,10 @@ class GetBibleSwordManager:
         manifest_path: Path,
         work_dir: Path,
         http: HttpClient | None = None,
-        token: str | None = None,
     ) -> None:
         self.manifest = EngineManifest.load(manifest_path)
         self.work_dir = work_dir
         self.http = http or HttpClient()
-        self.token = token or self._environment_token()
-
-    @staticmethod
-    def _environment_token() -> str | None:
-        for name in ("GETBIBLESWORD_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"):
-            value = os.environ.get(name, "").strip()
-            if value:
-                return value
-        return None
 
     @property
     def executable(self) -> Path:
@@ -118,29 +130,13 @@ class GetBibleSwordManager:
             self.verify(destination)
             return destination
 
-        asset_name = self.manifest.platform_asset()
-        checksum_name = f"{asset_name}.sha256"
-        release = self._release()
-        assets = {
-            str(item.get("name")): str(item.get("url"))
-            for item in release.get("assets", [])
-            if isinstance(item, dict)
-        }
-        missing = sorted({asset_name, checksum_name} - assets.keys())
-        if missing:
-            raise RuntimeError(
-                f"Release {self.manifest.tag} is missing required assets: {', '.join(missing)}"
-            )
-        for name in (asset_name, checksum_name):
-            self._validate_asset_url(assets[name])
+        asset = self.manifest.platform_asset()
+        asset_url = self.manifest.asset_url(asset)
+        self._validate_asset_url(asset_url, asset.name)
 
         downloads = self.work_dir / "downloads" / "getbiblesword" / self.manifest.version
-        checksum_path = downloads / checksum_name
-        archive_path = downloads / asset_name
-        headers = self._asset_headers()
-        self.http.download(assets[checksum_name], checksum_path, headers=headers)
-        expected = self._read_checksum(checksum_path, asset_name)
-        self.http.download(assets[asset_name], archive_path, expected, headers=headers)
+        archive_path = downloads / asset.name
+        self.http.download(asset_url, archive_path, asset.sha256)
         self._extract_binary(archive_path, destination)
         try:
             self.verify(destination)
@@ -149,51 +145,15 @@ class GetBibleSwordManager:
             raise
         return destination
 
-    def _release(self) -> dict[str, Any]:
-        url = (
-            f"https://api.github.com/repos/{self.manifest.repository}/releases/tags/"
-            f"{self.manifest.tag}"
-        )
-        try:
-            payload = self.http.get_bytes(url, headers=self._api_headers())
-            value = json.loads(payload)
-        except Exception as error:
-            raise RuntimeError(
-                f"Unable to resolve public pinned getbiblesword release "
-                f"{self.manifest.tag}; confirm the release is published and GitHub is reachable"
-            ) from error
-        if not isinstance(value, dict) or value.get("tag_name") != self.manifest.tag:
-            raise RuntimeError(f"GitHub returned an unexpected release for {self.manifest.tag}")
-        return value
-
-    def _api_headers(self) -> dict[str, str]:
-        headers = {
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-        }
-        if self.token:
-            headers["Authorization"] = f"Bearer {self.token}"
-        return headers
-
-    def _asset_headers(self) -> dict[str, str]:
-        headers = self._api_headers()
-        headers["Accept"] = "application/octet-stream"
-        return headers
-
-    def _validate_asset_url(self, url: str) -> None:
+    def _validate_asset_url(self, url: str, asset_name: str) -> None:
         parsed = urllib.parse.urlsplit(url)
-        prefix = f"/repos/{self.manifest.repository}/releases/assets/"
-        if parsed.scheme != "https" or parsed.netloc != "api.github.com":
-            raise RuntimeError("GitHub returned a release asset outside api.github.com")
-        if not parsed.path.startswith(prefix) or parsed.query or parsed.fragment:
-            raise RuntimeError("GitHub returned an unexpected release asset URL")
-
-    @staticmethod
-    def _read_checksum(path: Path, expected_name: str) -> str:
-        match = _CHECKSUM.fullmatch(path.read_text(encoding="ascii").strip())
-        if match is None or match.group(2) != expected_name:
-            raise RuntimeError(f"Invalid release checksum file for {expected_name}")
-        return match.group(1).casefold()
+        expected_path = (
+            f"/{self.manifest.repository}/releases/download/{self.manifest.tag}/{asset_name}"
+        )
+        if parsed.scheme != "https" or parsed.netloc != "github.com":
+            raise RuntimeError("Release asset is outside github.com")
+        if parsed.path != expected_path or parsed.query or parsed.fragment:
+            raise RuntimeError("Release asset URL does not match the pinned release")
 
     @staticmethod
     def _extract_binary(archive_path: Path, destination: Path) -> None:

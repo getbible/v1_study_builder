@@ -1,9 +1,6 @@
 # GetBible Study Builder v1
 
-[![Build](https://github.com/getbible/v1_study_builder/actions/workflows/build.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/build.yml)
-[![Tests](https://github.com/getbible/v1_study_builder/actions/workflows/ci.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/ci.yml)
-[![Binary smoke](https://github.com/getbible/v1_study_builder/actions/workflows/binary-smoke.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/binary-smoke.yml)
-[![Integration](https://github.com/getbible/v1_study_builder/actions/workflows/integration.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/integration.yml)
+[![Study APIs](https://github.com/getbible/v1_study_builder/actions/workflows/build.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/build.yml) [![Test Builder](https://github.com/getbible/v1_study_builder/actions/workflows/ci.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/ci.yml) [![GetBibleSword](https://github.com/getbible/v1_study_builder/actions/workflows/binary-smoke.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/binary-smoke.yml) [![CrossWire Corpus](https://github.com/getbible/v1_study_builder/actions/workflows/integration.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/integration.yml)
 
 `v1_study_builder` converts policy-approved CrossWire SWORD commentary and
 dictionary modules into two independently deployable static JSON APIs:
@@ -31,20 +28,19 @@ subprocess dependency.
 ## Extraction dependency
 
 `conf/getbiblesword.json` pins release `v0.1.1`, contract
-`getbiblesword.ndjson/v1`, and the exact x86-64/ARM64 Linux asset names. On first
-use the builder:
+`getbiblesword.ndjson/v1`, and the exact x86-64/ARM64 Linux asset names and
+SHA-256 digests. On first use the builder:
 
-1. resolves only the pinned GitHub release;
-2. downloads its architecture-specific archive and `.sha256` sidecar;
-3. verifies the archive checksum and safely extracts only `usr/bin/getbiblesword`;
-4. checks the executable's reported version and contract;
-5. caches it under `.work/tools/getbiblesword/0.1.1/`.
+1. constructs the direct public download URL for the pinned tag and asset;
+2. downloads the architecture-specific archive without calling the GitHub API;
+3. verifies it against the SHA-256 digest committed in the manifest;
+4. safely extracts only `usr/bin/getbiblesword`;
+5. checks the executable's reported version and contract;
+6. caches it under `.work/tools/getbiblesword/0.1.1/`.
 
 The `getbible/getbiblesword` repository and its pinned release are public, so
-installation requires no repository token. The automated smoke, integration, and
-production builds all exercise this unauthenticated path. The installer still
-accepts standard GitHub tokens when supplied explicitly, solely for environments
-that need a higher GitHub API rate limit.
+installation requires no repository token or GitHub API request. The automated
+smoke, integration, and production builds all exercise this unauthenticated path.
 
 Install or verify it explicitly:
 
