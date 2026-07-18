@@ -34,3 +34,13 @@ def test_release_asset_url_is_scoped_to_pinned_repository(
     )
     with pytest.raises(RuntimeError, match="outside api.github.com"):
         manager._validate_asset_url("https://example.com/archive.tar.gz")
+
+
+def test_public_release_request_does_not_require_authorization(
+    project_root: Path, tmp_path: Path, monkeypatch
+) -> None:
+    for name in ("GETBIBLESWORD_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    manager = GetBibleSwordManager(project_root / "conf/getbiblesword.json", tmp_path)
+    assert "Authorization" not in manager._api_headers()
+    assert manager._api_headers()["Accept"] == "application/vnd.github+json"
