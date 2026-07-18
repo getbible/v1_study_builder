@@ -158,12 +158,9 @@ class GetBibleSwordManager:
             payload = self.http.get_bytes(url, headers=self._api_headers())
             value = json.loads(payload)
         except Exception as error:
-            token_hint = (
-                " Set GETBIBLESWORD_TOKEN to a fine-grained token with Contents: read access"
-                " when the release repository is private."
-            )
             raise RuntimeError(
-                f"Unable to resolve pinned getbiblesword release {self.manifest.tag}.{token_hint}"
+                f"Unable to resolve public pinned getbiblesword release "
+                f"{self.manifest.tag}; confirm the release is published and GitHub is reachable"
             ) from error
         if not isinstance(value, dict) or value.get("tag_name") != self.manifest.tag:
             raise RuntimeError(f"GitHub returned an unexpected release for {self.manifest.tag}")

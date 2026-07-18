@@ -58,7 +58,8 @@ Clarke, TSK, MHCC, StrongsGreek, StrongsHebrew, and Easton from CrossWire packag
 
 ## Releases and secrets
 
-`GETBIBLESWORD_TOKEN` needs read access to the extractor repository while it is
-private. The full-build workflow generates output regardless of publication
-credentials and pushes only when its complete signing/SSH secret set is available.
-Never print, commit, cache, or package any token or key.
+The pinned `getbible/getbiblesword` release is public and must install without a
+repository token. The smoke and integration workflows intentionally exercise that
+unauthenticated path. The full-build workflow generates output regardless of
+publication credentials and pushes only when its complete signing/SSH secret set is
+available. Never print, commit, cache, or package any token or key.

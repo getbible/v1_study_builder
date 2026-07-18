@@ -2,6 +2,7 @@
 
 [![Build](https://github.com/getbible/v1_study_builder/actions/workflows/build.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/build.yml)
 [![Tests](https://github.com/getbible/v1_study_builder/actions/workflows/ci.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/ci.yml)
+[![Binary smoke](https://github.com/getbible/v1_study_builder/actions/workflows/binary-smoke.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/binary-smoke.yml)
 [![Integration](https://github.com/getbible/v1_study_builder/actions/workflows/integration.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/integration.yml)
 
 `v1_study_builder` converts policy-approved CrossWire SWORD commentary and
@@ -39,10 +40,11 @@ use the builder:
 4. checks the executable's reported version and contract;
 5. caches it under `.work/tools/getbiblesword/0.1.0/`.
 
-Because `getbible/getbiblesword` is private, set `GETBIBLESWORD_TOKEN` to a
-fine-grained token with read-only Contents access. The credential is used only in
-the GitHub API request and is never written into a generated repository or Docker
-image. If the extractor becomes public, the same installer works without a token.
+The `getbible/getbiblesword` repository and its pinned release are public, so
+installation requires no repository token. The automated smoke, integration, and
+production builds all exercise this unauthenticated path. The installer still
+accepts standard GitHub tokens when supplied explicitly, solely for environments
+that need a higher GitHub API rate limit.
 
 Install or verify it explicitly:
 
@@ -156,7 +158,6 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 
-export GETBIBLESWORD_TOKEN='read-only-token-if-required'
 study-builder engine install
 python -m ruff check src tests scripts
 python -m ruff format --check src tests scripts
@@ -198,6 +199,7 @@ show approved work without downloading packages or installing the extractor.
 | Workflow | Trigger | Result |
 | --- | --- | --- |
 | `ci.yml` | pull request, branch push, manual | Ruff, formatting, unit tests, malicious-contract rejection, CLI checks |
+| `binary-smoke.yml` | relevant pull request, main push, manual | Public release install/verification plus real Clarke and StrongsGreek JSON builds |
 | `integration.yml` | monthly, manual | Real builds of Clarke, TSK, MHCC, StrongsGreek, StrongsHebrew, and Easton; validates static lookup shape |
 | `build.yml` | monthly, manual | Complete selected resource build; conditionally signs and pushes both output repositories |
 
@@ -206,11 +208,8 @@ enabled and all six publication values are non-empty. With incomplete publicatio
 secrets it emits a notice, produces the local build and report, and skips Git setup,
 cloning, commits, and pushes.
 
-Required release/build secret:
-
-| Secret | Purpose |
-| --- | --- |
-| `GETBIBLESWORD_TOKEN` | Read-only access to the private pinned extractor release |
+No extractor-access secret is required. `binary-smoke.yml` proves that the pinned
+public release can be installed, verified, and used without authentication.
 
 Publication secret set:
 
@@ -240,13 +239,12 @@ module's license, copyright, holder/contact, text source, and distribution notes
 ```bash
 docker build -t getbible-study-builder:1 .
 docker run --rm \
-  -e GETBIBLESWORD_TOKEN \
   -v "$PWD/dist:/app/dist" \
   getbible-study-builder:1 build --resource all
 ```
 
-The image intentionally does not bake in a private release credential. The pinned
-extractor is downloaded and verified at runtime, then cached if `.work/` is mounted.
+The public pinned extractor is downloaded and verified at runtime, then cached if
+`.work/` is mounted.
 
 ## License
 
