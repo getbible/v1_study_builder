@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: GPL-2.0-only
+name: Public getBibleSword Binary Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/binary-smoke.yml"
+      - "conf/getbiblesword.json"
+      - "pyproject.toml"
+      - "requirements*.txt"
+      - "schemas/**"
+      - "scripts/validate_build.py"
+      - "src/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/binary-smoke.yml"
+      - "conf/getbiblesword.json"
+      - "pyproject.toml"
+      - "requirements*.txt"
+      - "schemas/**"
+      - "scripts/validate_build.py"
+      - "src/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.resource }} / ${{ matrix.module }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - resource: commentaries
+            module: Clarke
+          - resource: dictionaries
+            module: StrongsGreek
+    steps:
+      - name: Checkout Study Builder
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Study Builder
+        run: python -m pip install .
+      - name: Install and verify pinned public extractor
+        run: |
+          study-builder engine install
+          study-builder engine verify
+      - name: Build real CrossWire module
+        run: >-
+          study-builder build
+          --resource "${{ matrix.resource }}"
+          --module "${{ matrix.module }}"
+          --refresh
+      - name: Validate generated static API
+        run: >-
+          python scripts/validate_build.py
+          --resource "${{ matrix.resource }}"
+          --module "${{ matrix.module }}"
+      - name: Upload generated JSON and build report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-extractor-${{ matrix.resource }}-${{ matrix.module }}-${{ github.run_id }}
+          path: |
+            dist/
+            .work/reports/latest.json
+          if-no-files-found: warn
+          retention-days: 7
