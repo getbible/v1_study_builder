@@ -144,6 +144,7 @@ class BuildPipeline:
         }
         for kind, module in approved:
             LOG.info("Building %s module %s", kind, module.name)
+            exported = None
             try:
                 installation = installer.install(module)
                 exported = exporter.export(installation, module.name)
@@ -185,6 +186,9 @@ class BuildPipeline:
                 report.failed.append(
                     {"resource": kind, "module": module.name, "reason": str(error)}
                 )
+            finally:
+                if exported is not None:
+                    exported.close()
         if report.failed:
             report.completed_at = utc_now()
             self._write_report(report)

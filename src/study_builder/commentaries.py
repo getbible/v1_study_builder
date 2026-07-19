@@ -22,8 +22,43 @@ class CommentaryWriter:
     def write(self, module: ModuleDescriptor, exported: NativeExport) -> dict[str, Any]:
         module_id = slug(module.name)
         module_root = self.root / module_id
-        grouped: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
-        seen: set[tuple[int, int, int, str]] = set()
+        chapter_indexes: dict[int, list[dict[str, Any]]] = defaultdict(list)
+        chapter_entries: list[dict[str, Any]] = []
+        chapter_seen: set[tuple[int, str]] = set()
+        current: tuple[int, int] | None = None
+        entry_count = 0
+
+        def flush_chapter() -> None:
+            nonlocal chapter_entries, entry_count
+            if current is None:
+                return
+            book_number, chapter_number = current
+            book = self.books.by_number[book_number]
+            entries = sorted(
+                chapter_entries,
+                key=lambda item: (item["verse"], item["name"]),
+            )
+            document = {
+                "schema": "getbible-commentary-chapter-v1",
+                "commentary": module_id,
+                "language": module.language,
+                "book": book_number,
+                "name": book.name,
+                "chapter": chapter_number,
+                "entries": entries,
+            }
+            validate(document, self.schema)
+            write_json(module_root / str(book_number) / f"{chapter_number}.json", document)
+            chapter_indexes[book_number].append(
+                {
+                    "chapter": chapter_number,
+                    "entry_count": len(entries),
+                    "url": f"{book_number}/{chapter_number}.json",
+                }
+            )
+            entry_count += len(entries)
+            chapter_entries = []
+
         for source in exported.entries:
             verse = source.get("verse") or {}
             chapter = int(verse.get("chapter", 0) or 0)
@@ -37,10 +72,20 @@ class CommentaryWriter:
             content = public_content(source)
             if not content.get("text") and not content.get("html"):
                 continue
-            unique = (book.number, chapter, verse_number, content.get("text", ""))
-            if unique in seen:
+            coordinate = (book.number, chapter)
+            if current is not None and coordinate < current:
+                raise RuntimeError(
+                    "getbiblesword commentary entries are not in canonical book/chapter order: "
+                    f"{coordinate!r} followed {current!r}"
+                )
+            if coordinate != current:
+                flush_chapter()
+                current = coordinate
+                chapter_seen = set()
+            unique = (verse_number, content.get("text", ""))
+            if unique in chapter_seen:
                 continue
-            seen.add(unique)
+            chapter_seen.add(unique)
             osis = str(verse.get("osis", ""))
             related = []
             for reference in extract_osis_references(
@@ -71,36 +116,15 @@ class CommentaryWriter:
             }
             if related:
                 entry["references"] = related
-            grouped[(book.number, chapter)].append(entry)
+            chapter_entries.append(entry)
+
+        flush_chapter()
 
         books_index: list[dict[str, Any]] = []
-        for book_number in sorted({key[0] for key in grouped}):
+        for book_number in sorted(chapter_indexes):
             book = self.books.by_number[book_number]
-            chapter_numbers = sorted(chapter for nr, chapter in grouped if nr == book_number)
-            chapter_index: list[dict[str, Any]] = []
-            for chapter_number in chapter_numbers:
-                entries = sorted(
-                    grouped[(book_number, chapter_number)],
-                    key=lambda item: (item["verse"], item["name"]),
-                )
-                document = {
-                    "schema": "getbible-commentary-chapter-v1",
-                    "commentary": module_id,
-                    "language": module.language,
-                    "book": book_number,
-                    "name": book.name,
-                    "chapter": chapter_number,
-                    "entries": entries,
-                }
-                validate(document, self.schema)
-                write_json(module_root / str(book_number) / f"{chapter_number}.json", document)
-                chapter_index.append(
-                    {
-                        "chapter": chapter_number,
-                        "entry_count": len(entries),
-                        "url": f"{book_number}/{chapter_number}.json",
-                    }
-                )
+            chapter_index = chapter_indexes[book_number]
+            chapter_numbers = [record["chapter"] for record in chapter_index]
             write_json(
                 module_root / f"{book_number}.json",
                 {
@@ -133,7 +157,7 @@ class CommentaryWriter:
             "driver": module.driver,
             "source_type": module.first("sourcetype"),
             "versification": module.first("versification", "KJV"),
-            "entry_count": sum(len(entries) for entries in grouped.values()),
+            "entry_count": entry_count,
             "book_count": len(books_index),
             "books_url": "books.json",
             "chapter_url_template": "{book}/{chapter}.json",

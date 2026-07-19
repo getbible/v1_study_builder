@@ -65,10 +65,7 @@ class DictionaryWriter:
         used_ids: dict[str, str] = {}
         occurrences: dict[str, int] = defaultdict(int)
 
-        ordered_entries = sorted(
-            exported.entries, key=lambda entry: str(entry.get("key", "")).casefold()
-        )
-        for source in ordered_entries:
+        for source in exported.entries:
             key = str(source.get("key", "")).strip()
             if not key:
                 continue
@@ -115,7 +112,9 @@ class DictionaryWriter:
             shard = hashlib.sha256(key.casefold().encode("utf-8")).hexdigest()[:2]
             shards[shard].append(index_record)
 
+        key_index.sort(key=lambda record: (record["key"].casefold(), record["occurrence"]))
         for shard, records in sorted(shards.items()):
+            records.sort(key=lambda record: (record["key"].casefold(), record["occurrence"]))
             write_json(module_root / "indexes" / f"{shard}.json", records)
         write_json(module_root / "keys.json", key_index)
         metadata = {

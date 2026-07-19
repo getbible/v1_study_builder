@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 
 from study_builder.contract import ContractError, GetBibleSwordContractReader
+from study_builder.entries import EntrySpool
 
 
 def byte_value(value: str | bytes) -> dict[str, Any]:
@@ -123,11 +124,16 @@ def reader(project_root: Path) -> GetBibleSwordContractReader:
 
 def test_valid_stream_maps_authoritative_bytes(reader: GetBibleSwordContractReader) -> None:
     exported = reader.read(io.BytesIO(stream(base_records())))
+    assert isinstance(exported.entries, EntrySpool)
     assert exported.metadata["classification"] == "commentary"
     assert exported.metadata["name"] == "TestCom"
     assert exported.entries[0]["key"] == "John 1:1"
     assert exported.entries[0]["plain"] == "Word"
     assert exported.entries[0]["verse"]["osis"] == "John.1.1"
+    assert [entry["key"] for entry in exported.entries] == ["John 1:1"]
+    exported.close()
+    with pytest.raises(RuntimeError, match="not available"):
+        list(exported.entries)
 
 
 def test_artifact_chunks_are_reassembled_and_verified(

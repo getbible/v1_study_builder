@@ -67,8 +67,12 @@ and independently checks all of the rules that protect publication:
 
 Raw bytes remain authoritative. The adapter derives safe text/HTML for the public
 API only after verification and retains the original contract records internally.
-Any missing footer, checksum failure, failed diagnostic, extractor error, or
-classification mismatch stops the complete build before publication.
+Validated entries are held in a compressed, disk-backed spool; commentary output
+then flushes one chapter at a time and dictionary definitions are written one at a
+time. This keeps memory bounded for large modules without weakening the contract or
+the all-or-nothing publication rule. Any missing footer, checksum failure, failed
+diagnostic, extractor error, or classification mismatch stops the complete build
+before publication.
 
 ## Commentary API
 

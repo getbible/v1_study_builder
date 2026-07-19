@@ -12,6 +12,7 @@ from typing import Any, BinaryIO
 
 from jsonschema import Draft202012Validator
 
+from study_builder.entries import EntrySpool
 from study_builder.models import NativeExport
 from study_builder.util import read_json
 
@@ -102,13 +103,20 @@ class GetBibleSwordContractReader:
         self.expected_contract = expected_contract
 
     def read(self, stream: BinaryIO) -> NativeExport:
+        entries = EntrySpool()
+        try:
+            return self._read(stream, entries)
+        except BaseException:
+            entries.close()
+            raise
+
+    def _read(self, stream: BinaryIO, entries: EntrySpool) -> NativeExport:
         sequence = 0
         stream_hash = hashlib.sha256()
         counts: Counter[str] = Counter()
         header: dict[str, Any] | None = None
         module: dict[str, Any] | None = None
         footer: dict[str, Any] | None = None
-        entries: list[dict[str, Any]] = []
         diagnostics: list[dict[str, Any]] = []
         diagnostic_counts: Counter[str] = Counter()
         configuration: dict[str, list[str]] = {}
@@ -284,6 +292,7 @@ class GetBibleSwordContractReader:
         metadata = self._adapt_module(module, configuration)
         metadata["_getbiblesword_header"] = header
         metadata["_getbiblesword_record"] = module
+        entries.finish()
         return NativeExport(
             metadata=metadata,
             entries=entries,

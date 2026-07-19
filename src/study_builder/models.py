@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -51,9 +52,14 @@ class PolicyDecision:
 @dataclass(frozen=True)
 class NativeExport:
     metadata: dict[str, Any]
-    entries: list[dict[str, Any]]
+    entries: Sequence[dict[str, Any]]
     diagnostics: tuple[dict[str, Any], ...] = ()
     footer: dict[str, Any] = field(default_factory=dict)
+
+    def close(self) -> None:
+        close = getattr(self.entries, "close", None)
+        if callable(close):
+            close()
 
 
 @dataclass

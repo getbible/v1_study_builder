@@ -47,6 +47,7 @@ class SwordExporter:
             finally:
                 process.stdout.close()
             if return_code:
+                exported.close()
                 errors.seek(0)
                 detail = errors.read().decode("utf-8", errors="replace").strip()
                 raise RuntimeError(

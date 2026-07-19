@@ -7,8 +7,7 @@ on:
     paths:
       - ".github/workflows/integration.yml"
       - "conf/getbiblesword.json"
-      - "src/study_builder/engine.py"
-      - "src/study_builder/http.py"
+      - "src/**"
   schedule:
     - cron: "27 3 15 * *"
   workflow_dispatch:
@@ -31,6 +30,8 @@ jobs:
             module: TSK
           - resource: commentaries
             module: MHCC
+          - resource: commentaries
+            module: Luther
           - resource: dictionaries
             module: StrongsGreek
           - resource: dictionaries

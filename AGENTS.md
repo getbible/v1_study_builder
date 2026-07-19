@@ -30,8 +30,10 @@ consumer in `src/study_builder/contract.py` must continue to verify:
 
 Never use a `utf8` convenience field as the authoritative value. Decode `base64`,
 verify it, then create the public text projection. Unknown additive fields must be
-retained in the internal source record. A missing footer, failed digest, failed
-artifact, unsupported major contract, or extractor error blocks all publication.
+retained in the internal source record. Validated entries remain disk-backed and
+writers stream them; do not restore whole-module entry or commentary collections in
+memory. A missing footer, failed digest, failed artifact, unsupported major contract,
+or extractor error blocks all publication.
 
 ## API stability
 
@@ -57,7 +59,8 @@ python -m pytest
 ```
 
 The live integration workflow additionally installs the pinned release and builds
-Clarke, TSK, MHCC, StrongsGreek, StrongsHebrew, and Easton from CrossWire packages.
+Clarke, TSK, MHCC, Luther, StrongsGreek, StrongsHebrew, and Easton from CrossWire
+packages. Luther is the large-corpus memory regression module.
 
 ## Releases and secrets
 
