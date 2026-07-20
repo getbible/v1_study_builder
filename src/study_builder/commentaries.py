@@ -8,6 +8,7 @@ from urllib.parse import quote
 from jsonschema import validate
 
 from study_builder.books import BookRegistry
+from study_builder.chapter_spool import CommentaryChapterSpool
 from study_builder.content import extract_osis_references, public_content
 from study_builder.models import ModuleDescriptor, NativeExport
 from study_builder.util import read_json, slug, write_json
@@ -23,102 +24,84 @@ class CommentaryWriter:
         module_id = slug(module.name)
         module_root = self.root / module_id
         chapter_indexes: dict[int, list[dict[str, Any]]] = defaultdict(list)
-        chapter_entries: list[dict[str, Any]] = []
-        chapter_seen: set[tuple[int, str]] = set()
-        current: tuple[int, int] | None = None
         entry_count = 0
 
-        def flush_chapter() -> None:
-            nonlocal chapter_entries, entry_count
-            if current is None:
-                return
-            book_number, chapter_number = current
-            book = self.books.by_number[book_number]
-            entries = sorted(
-                chapter_entries,
-                key=lambda item: (item["verse"], item["name"]),
-            )
-            document = {
-                "schema": "getbible-commentary-chapter-v1",
-                "commentary": module_id,
-                "language": module.language,
-                "book": book_number,
-                "name": book.name,
-                "chapter": chapter_number,
-                "entries": entries,
-            }
-            validate(document, self.schema)
-            write_json(module_root / str(book_number) / f"{chapter_number}.json", document)
-            chapter_indexes[book_number].append(
-                {
-                    "chapter": chapter_number,
-                    "entry_count": len(entries),
-                    "url": f"{book_number}/{chapter_number}.json",
+        with CommentaryChapterSpool() as chapters:
+            for source in exported.entries:
+                verse = source.get("verse") or {}
+                chapter = int(verse.get("chapter", 0) or 0)
+                verse_number = int(verse.get("verse", 0) or 0)
+                if chapter < 0 or verse_number < 0:
+                    continue
+                try:
+                    book = self.books.from_entry(source)
+                except ValueError:
+                    continue
+                content = public_content(source)
+                if not content.get("text") and not content.get("html"):
+                    continue
+                osis = str(verse.get("osis", ""))
+                related = []
+                for reference in extract_osis_references(
+                    str(source.get("raw", "")), str(source.get("html", ""))
+                ):
+                    normalized = self.books.reference(reference)
+                    if normalized:
+                        related.append(normalized)
+                anchor = {
+                    "book": book.number,
+                    "chapter": chapter,
+                    "verse": verse_number,
                 }
-            )
-            entry_count += len(entries)
-            chapter_entries = []
+                if osis:
+                    anchor["osis"] = osis
+                label = book.name
+                if chapter:
+                    label += f" {chapter}"
+                    if verse_number:
+                        label += f":{verse_number}"
+                entry: dict[str, Any] = {
+                    "book": book.number,
+                    "chapter": chapter,
+                    "verse": verse_number,
+                    "name": label,
+                    "anchor": anchor,
+                    **content,
+                }
+                if related:
+                    entry["references"] = related
+                chapters.append(entry)
 
-        for source in exported.entries:
-            verse = source.get("verse") or {}
-            chapter = int(verse.get("chapter", 0) or 0)
-            verse_number = int(verse.get("verse", 0) or 0)
-            if chapter < 0 or verse_number < 0:
-                continue
-            try:
-                book = self.books.from_entry(source)
-            except ValueError:
-                continue
-            content = public_content(source)
-            if not content.get("text") and not content.get("html"):
-                continue
-            coordinate = (book.number, chapter)
-            if current is not None and coordinate < current:
-                raise RuntimeError(
-                    "getbiblesword commentary entries are not in canonical book/chapter order: "
-                    f"{coordinate!r} followed {current!r}"
+            for book_number, chapter_number in chapters.coordinates():
+                chapter_seen: set[tuple[int, str]] = set()
+                chapter_entries: list[dict[str, Any]] = []
+                for entry in chapters.entries(book_number, chapter_number):
+                    unique = (int(entry["verse"]), str(entry.get("text", "")))
+                    if unique in chapter_seen:
+                        continue
+                    chapter_seen.add(unique)
+                    chapter_entries.append(entry)
+                chapter_entries.sort(key=lambda item: (item["verse"], item["name"]))
+                book = self.books.by_number[book_number]
+                document = {
+                    "schema": "getbible-commentary-chapter-v1",
+                    "commentary": module_id,
+                    "language": module.language,
+                    "book": book_number,
+                    "name": book.name,
+                    "chapter": chapter_number,
+                    "entries": chapter_entries,
+                }
+                validate(document, self.schema)
+                write_json(module_root / str(book_number) / f"{chapter_number}.json", document)
+                chapter_indexes[book_number].append(
+                    {
+                        "chapter": chapter_number,
+                        "entry_count": len(chapter_entries),
+                        "url": f"{book_number}/{chapter_number}.json",
+                    }
                 )
-            if coordinate != current:
-                flush_chapter()
-                current = coordinate
-                chapter_seen = set()
-            unique = (verse_number, content.get("text", ""))
-            if unique in chapter_seen:
-                continue
-            chapter_seen.add(unique)
-            osis = str(verse.get("osis", ""))
-            related = []
-            for reference in extract_osis_references(
-                str(source.get("raw", "")), str(source.get("html", ""))
-            ):
-                normalized = self.books.reference(reference)
-                if normalized:
-                    related.append(normalized)
-            anchor = {
-                "book": book.number,
-                "chapter": chapter,
-                "verse": verse_number,
-            }
-            if osis:
-                anchor["osis"] = osis
-            label = book.name
-            if chapter:
-                label += f" {chapter}"
-                if verse_number:
-                    label += f":{verse_number}"
-            entry: dict[str, Any] = {
-                "book": book.number,
-                "chapter": chapter,
-                "verse": verse_number,
-                "name": label,
-                "anchor": anchor,
-                **content,
-            }
-            if related:
-                entry["references"] = related
-            chapter_entries.append(entry)
-
-        flush_chapter()
+                entry_count += len(chapter_entries)
 
         books_index: list[dict[str, Any]] = []
         for book_number in sorted(chapter_indexes):
