@@ -67,12 +67,14 @@ and independently checks all of the rules that protect publication:
 
 Raw bytes remain authoritative. The adapter derives safe text/HTML for the public
 API only after verification and retains the original contract records internally.
-Validated entries are held in a compressed, disk-backed spool; commentary output
-then flushes one chapter at a time and dictionary definitions are written one at a
-time. This keeps memory bounded for large modules without weakening the contract or
-the all-or-nothing publication rule. Any missing footer, checksum failure, failed
-diagnostic, extractor error, or classification mismatch stops the complete build
-before publication.
+Validated entries are held in a compressed, disk-backed spool. Commentary entries
+are then normalized into disk-backed chapter buckets and emitted in canonical
+GetBible book/chapter order; this supports source modules whose versification orders
+canonical or deuterocanonical books differently. Dictionary definitions are written
+one at a time. This keeps memory bounded for large modules without weakening the
+contract or the all-or-nothing publication rule. Any missing footer, checksum
+failure, failed diagnostic, extractor error, or classification mismatch stops the
+complete build before publication.
 
 ## Commentary API
 
@@ -207,7 +209,7 @@ show approved work without downloading packages or installing the extractor.
 | Workflow | Trigger | Result |
 | --- | --- | --- |
 | `ci.yml` | pull request, branch push, manual | Ruff, formatting, unit tests, malicious-contract rejection, CLI checks |
-| `binary-smoke.yml` | relevant pull request, main push, manual | Public release install/verification plus real Clarke and StrongsGreek JSON builds |
+| `binary-smoke.yml` | relevant pull request, main push, manual | Public release verification plus real canonical and alternate-versification builds |
 | `integration.yml` | monthly, manual | Real builds of Clarke, TSK, MHCC, StrongsGreek, StrongsHebrew, and Easton; validates static lookup shape |
 | `build.yml` | monthly, manual | Complete selected resource build; conditionally signs and pushes both output repositories |
 

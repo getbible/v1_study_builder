@@ -38,6 +38,12 @@ jobs:
         include:
           - resource: commentaries
             module: Clarke
+          - resource: commentaries
+            module: FreAug
+          - resource: commentaries
+            module: FreChry
+          - resource: commentaries
+            module: VulgGlossa
           - resource: dictionaries
             module: StrongsGreek
           - resource: dictionaries
