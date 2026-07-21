@@ -65,8 +65,8 @@ def parser() -> argparse.ArgumentParser:
             "git@github.com:getbible/v1_dictionaries.git",
         ),
     )
-    build.add_argument("--commentaries-branch", default="master")
-    build.add_argument("--dictionaries-branch", default="master")
+    build.add_argument("--commentaries-branch", default="main")
+    build.add_argument("--dictionaries-branch", default="main")
     build.add_argument("--pull", action="store_true", help="Clone/pull target repositories")
     build.add_argument("--push", action="store_true", help="Commit and push changed output")
     build.add_argument("--refresh", action="store_true", help="Redownload catalog and packages")

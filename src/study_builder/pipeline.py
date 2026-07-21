@@ -49,8 +49,8 @@ class PipelineConfig:
     dry_run: bool = False
     commentaries_repo: str = "git@github.com:getbible/v1_commentaries.git"
     dictionaries_repo: str = "git@github.com:getbible/v1_dictionaries.git"
-    commentaries_branch: str = "master"
-    dictionaries_branch: str = "master"
+    commentaries_branch: str = "main"
+    dictionaries_branch: str = "main"
 
 
 class BuildPipeline:
