@@ -31,7 +31,10 @@ class CommentaryWriter:
                 verse = source.get("verse") or {}
                 chapter = int(verse.get("chapter", 0) or 0)
                 verse_number = int(verse.get("verse", 0) or 0)
-                if chapter < 0 or verse_number < 0:
+                # The public commentary API is chapter-addressable. SWORD modules may
+                # also expose book introductions with chapter zero; those records do
+                # not have a chapter endpoint and intentionally remain unpublished.
+                if chapter <= 0 or verse_number < 0:
                     continue
                 try:
                     book = self.books.from_entry(source)

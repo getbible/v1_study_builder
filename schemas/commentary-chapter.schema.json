@@ -10,7 +10,7 @@
     "language": {"type": "string", "minLength": 2},
     "book": {"type": "integer", "minimum": 1, "maximum": 83},
     "name": {"type": "string", "minLength": 1},
-    "chapter": {"type": "integer", "minimum": 0},
+    "chapter": {"type": "integer", "minimum": 1},
     "entries": {
       "type": "array",
       "items": {
@@ -18,7 +18,7 @@
         "required": ["book", "chapter", "verse", "name", "anchor", "text"],
         "properties": {
           "book": {"type": "integer", "minimum": 1, "maximum": 83},
-          "chapter": {"type": "integer", "minimum": 0},
+          "chapter": {"type": "integer", "minimum": 1},
           "verse": {"type": "integer", "minimum": 0},
           "name": {"type": "string"},
           "anchor": {
@@ -26,7 +26,7 @@
             "required": ["book", "chapter", "verse"],
             "properties": {
               "book": {"type": "integer"},
-              "chapter": {"type": "integer"},
+              "chapter": {"type": "integer", "minimum": 1},
               "verse": {"type": "integer"},
               "osis": {"type": "string"}
             },
@@ -42,4 +42,3 @@
   },
   "additionalProperties": false
 }
-

@@ -1,6 +1,6 @@
 # Target repository setup
 
-Create two empty repositories with `master` as their default branch:
+Create two empty repositories with `main` as their default branch:
 
 - `getbible/v1_commentaries`
 - `getbible/v1_dictionaries`
@@ -25,7 +25,7 @@ default target URLs are already compiled into the CLI. Set the optional
 `GETBIBLE_COMMENTARIES_REPO` and `GETBIBLE_DICTIONARIES_REPO` secrets only when
 using forks, staging repositories, or non-GitHub remotes.
 
-Protect `master` on both generated repositories against manual changes, while
+Protect `main` on both generated repositories against manual changes, while
 allowing the builder deploy key to push. Serve the repository checkout directly
 with Nginx; no application runtime is required.
 

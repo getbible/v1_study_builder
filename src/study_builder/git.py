@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 class GitRepository:
-    def __init__(self, url: str, path: Path, branch: str = "master") -> None:
+    def __init__(self, url: str, path: Path, branch: str = "main") -> None:
         self.url = url
         self.path = path
         self.branch = branch

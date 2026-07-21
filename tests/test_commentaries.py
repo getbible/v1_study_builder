@@ -104,6 +104,53 @@ def test_commentary_consumes_source_entries_once(tmp_path, project_root, comment
     assert (tmp_path / "testcom/1/2.json").is_file()
 
 
+def test_commentary_skips_entries_without_a_scripture_chapter(
+    tmp_path, project_root, commentary_module
+) -> None:
+    export = NativeExport(
+        metadata={},
+        entries=[
+            {
+                "key": "Genesis",
+                "raw": "Book introduction",
+                "plain": "Book introduction",
+                "html": "",
+                "verse": {
+                    "osis": "Gen",
+                    "testament": 1,
+                    "book": 1,
+                    "chapter": 0,
+                    "verse": 0,
+                },
+            },
+            {
+                "key": "Genesis 1",
+                "raw": "Chapter introduction",
+                "plain": "Chapter introduction",
+                "html": "",
+                "verse": {
+                    "osis": "Gen.1",
+                    "testament": 1,
+                    "book": 1,
+                    "chapter": 1,
+                    "verse": 0,
+                },
+            },
+        ],
+    )
+
+    summary = CommentaryWriter(
+        tmp_path,
+        BookRegistry(project_root / "conf/book_registry.json"),
+        project_root / "schemas/commentary-chapter.schema.json",
+    ).write(commentary_module, export)
+
+    chapter = json.loads((tmp_path / "testcom/1/1.json").read_text(encoding="utf-8"))
+    assert summary["entry_count"] == 1
+    assert not (tmp_path / "testcom/1/0.json").exists()
+    assert [entry["name"] for entry in chapter["entries"]] == ["Genesis 1"]
+
+
 def test_commentary_canonicalizes_interleaved_source_chapters(
     tmp_path, project_root, commentary_module
 ) -> None:
