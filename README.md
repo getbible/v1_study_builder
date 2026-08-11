@@ -238,9 +238,13 @@ scripts/verify_live_api.sh https://commentaries.getbible.net
 ```
 
 The whole tree is checked against `hashes.json` before it reaches the live root,
-so a failed build leaves the previous one serving. `docs/nginx/` holds the origin
-configuration for both hosts and `docs/deployment.md` describes the server
-layout, the caching model, the CDN and security posture, and rollback.
+so a failed build leaves the previous one serving.
+
+`docs/nginx/` holds the origin configuration for both hosts; install it with
+`scripts/install_nginx_config.sh`, which adapts it to the host's nginx version,
+brotli availability, and IPv6 support rather than leaving those as footguns.
+`docs/deployment.md` describes the server layout, the caching model, the CDN and
+security posture, rollback, and monitoring.
 
 ## Local development
 

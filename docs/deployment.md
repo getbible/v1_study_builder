@@ -36,9 +36,10 @@ the deployment stops being safe:
 ```
 /var/lib/getbible/commentaries      persistent Git checkout (working copy)
 /var/www/getbible/commentaries      live root nginx serves — version dirs only
-/etc/nginx/conf.d/getbible-api-http.conf
-/etc/nginx/snippets/getbible-api-headers.conf
-/etc/nginx/snippets/getbible-api-v1.conf
+/etc/nginx/conf.d/getbible-api-http.conf        zones and log format (http only)
+/etc/nginx/snippets/getbible-api-server.conf    tuning, TLS, compression
+/etc/nginx/snippets/getbible-api-headers.conf   CORS and security headers
+/etc/nginx/snippets/getbible-api-v1.conf        the v1 locations
 /etc/nginx/sites-available/commentaries.getbible.net.conf
 ```
 
@@ -48,34 +49,58 @@ off the origin entirely rather than relying on a rule to hide it.
 
 ## First-time setup
 
-Requires nginx 1.25.1 or newer (for `http2 on`), git, rsync, python3, gzip, and
-ideally brotli.
+Requires nginx (1.25.1+ preferred; older is adapted automatically), git,
+rsync, python3, gzip, and ideally brotli.
 
 ```bash
-apt-get install -y nginx git rsync python3 brotli
+apt-get install -y nginx git rsync python3 certbot brotli
 # Brotli for nginx is a separate module; without it only .gz is served, which
-# still works — it is roughly 15-20% larger on JSON than brotli.
+# still works and is roughly 15-20% larger on JSON.
 apt-get install -y libnginx-mod-http-brotli   # where packaged
 
-install -d -m 755 /var/www/getbible /var/lib/getbible /var/www/acme
-
-cp docs/nginx/getbible-api-http.conf        /etc/nginx/conf.d/
-cp docs/nginx/snippets/*.conf               /etc/nginx/snippets/
-cp docs/nginx/*.getbible.net.conf           /etc/nginx/sites-available/
-ln -sf /etc/nginx/sites-available/commentaries.getbible.net.conf /etc/nginx/sites-enabled/
-ln -sf /etc/nginx/sites-available/dictionaries.getbible.net.conf /etc/nginx/sites-enabled/
+install -d -m 755 /var/lib/getbible
 ```
 
-If the brotli module is installed, uncomment the three `brotli_static on;` lines
-in `snippets/getbible-api-v1.conf`.
-
-Issue certificates before the first `nginx -t`, since the server blocks
-reference them:
+Issue the certificates first — nginx refuses to start when a referenced
+certificate is missing. The stock nginx site already serves `/var/www/html` on
+port 80, so this works before anything below is installed, and the installed
+configuration keeps serving the same webroot afterwards so renewals need no
+further changes:
 
 ```bash
-certbot certonly --webroot -w /var/www/acme \
+certbot certonly --webroot -w /var/www/html \
     -d commentaries.getbible.net -d dictionaries.getbible.net
-nginx -t && systemctl reload nginx
+```
+
+Then install the origin configuration:
+
+```bash
+scripts/install_nginx_config.sh --reload
+```
+
+Do not copy `docs/nginx/` into place by hand. Three things legitimately differ
+between hosts, and guessing wrong on any of them stops nginx from starting, so
+the installer detects them instead:
+
+- **`http2 on` is nginx 1.25.1+.** On older nginx — Ubuntu 24.04 LTS still ships
+  1.24 — it is folded back into the `listen` line.
+- **`brotli_static` needs `ngx_brotli`**, which many distributions do not
+  package. It is enabled only when the module is actually present.
+- **IPv6 listeners fail outright** on a host without IPv6.
+
+The installer stages the adapted files, refuses to proceed if a certificate is
+missing (naming the exact certbot command), and runs `nginx -t` before
+reloading. `--dry-run` shows what it would install and leaves the adapted files
+for inspection.
+
+Reload nginx automatically after each renewal:
+
+```bash
+cat > /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh <<'HOOK'
+#!/bin/sh
+systemctl reload nginx
+HOOK
+chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
 ```
 
 ## Deploying
@@ -145,6 +170,20 @@ WantedBy=timers.target
 
 The builder runs monthly, so a daily timer simply finds nothing to do most days
 — the pull is a no-op, verification passes, and rsync transfers nothing.
+
+### Why the configuration is split the way it is
+
+`conf.d/getbible-api-http.conf` holds only the shared memory zones and the log
+format, because those cannot live in a server block. Everything else is in
+`snippets/getbible-api-server.conf` and included per host.
+
+That is not tidiness. A distribution's stock `nginx.conf` already sets
+`sendfile`, `gzip`, `tcp_nopush`, `ssl_protocols`, and
+`ssl_prefer_server_ciphers` at http level, and nginx treats a second
+declaration in the same context as a fatal `directive is duplicate` error — so
+an http-context drop-in would refuse to start on a stock Ubuntu box. Server
+context directives override the http-level ones instead. Keep new settings in
+the server snippet unless they genuinely cannot go there.
 
 ## The caching model
 
@@ -264,6 +303,9 @@ Watch these, in rough order of how much they matter:
 - 429 rate. A rising 429 rate usually means a client is ignoring
   `Cache-Control`, not that the limits are too tight.
 - Certificate expiry.
+- Access log growth. The logs are named `*.access.log` so the stock
+  `/etc/logrotate.d/nginx` glob (`/var/log/nginx/*.log`) rotates them; renaming
+  them outside that glob silently fills the disk.
 
 ## Adding a v2 later
 

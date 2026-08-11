@@ -301,14 +301,17 @@ fi
 if [[ -n "$VERIFY_URL" ]]; then
     command -v curl >/dev/null || die "--verify-url needs curl"
     log "verifying $VERIFY_URL"
-    read -r status type < <(
-        curl --silent --show-error --fail --location --max-time 30 \
-             --output /dev/null --write-out '%{http_code} %{content_type}\n' \
-             "$VERIFY_URL"
-    )
+    # No --fail: the status code is what is being checked, so it has to come
+    # back rather than turning into a bare non-zero exit with no explanation.
+    response="$(curl --silent --show-error --location --max-time 30 \
+        --output /dev/null --write-out '%{http_code} %{content_type}' "$VERIFY_URL" || true)"
+    status="${response%% *}"
+    content_type="${response#* }"
+    [[ -n "$status" && "$status" != "000" ]] || die "could not reach $VERIFY_URL"
     [[ "$status" == "200" ]] || die "$VERIFY_URL returned HTTP $status"
-    [[ "$type" == application/json* ]] || die "$VERIFY_URL returned Content-Type $type"
-    log "live check passed ($status $type)"
+    [[ "$content_type" == application/json* ]] \
+        || die "$VERIFY_URL returned Content-Type ${content_type:-none}"
+    log "live check passed ($status $content_type)"
 fi
 
 log "deployed $REVISION to $ROOT"
