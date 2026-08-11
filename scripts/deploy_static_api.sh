@@ -48,7 +48,9 @@ log() {
 }
 
 usage() {
-    sed -n '3,28p' "$0" | sed 's/^# \{0,1\}//'
+    # The header comment block, minus the shebang and licence line. Bounded by
+    # the block itself rather than a line range, which drifts when it is edited.
+    awk 'NR > 2 && /^#/ { sub(/^# ?/, ""); print; next } NR > 2 { exit }' "$0"
     cat <<'USAGE'
 
 Options:
@@ -166,11 +168,19 @@ for relative, expected in sorted(files.items()):
     if digest.hexdigest() != expected:
         problems.append(f"digest mismatch: {relative}")
 
-published = {
-    path.relative_to(root).as_posix()
-    for path in root.rglob("*.json")
-    if path.name != "hashes.json"
-}
+# Every file, not just every .json. The manifest is the complete list of what
+# the builder publishes, so anything else in the tree is unaccounted for and
+# must not reach the origin — an unexpected .html or .js would otherwise be
+# served from the API's own hostname.
+variants = (".json.gz", ".json.br")
+published = set()
+for path in root.rglob("*"):
+    if not path.is_file():
+        continue
+    relative = path.relative_to(root).as_posix()
+    if relative == "hashes.json" or relative.endswith(variants):
+        continue
+    published.add(relative)
 for extra in sorted(published - set(files)):
     problems.append(f"not in manifest: {extra}")
 
