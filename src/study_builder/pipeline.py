@@ -19,6 +19,7 @@ from study_builder.modules import ModuleInstaller
 from study_builder.native import SwordExporter
 from study_builder.policy import ModulePolicy
 from study_builder.util import (
+    DOCUMENT_CEILING_BYTES,
     hash_tree,
     replace_tree,
     reset_directory,
@@ -77,6 +78,7 @@ class PipelineConfig:
     dictionaries_repo: str = "git@github.com:getbible/dictionaries.git"
     commentaries_branch: str = "main"
     dictionaries_branch: str = "main"
+    max_document_bytes: int = DOCUMENT_CEILING_BYTES
 
 
 class BuildPipeline:
@@ -200,15 +202,30 @@ class BuildPipeline:
                         for item in exported.diagnostics
                     ]
                 writer = (
-                    CommentaryWriter(generated_roots[kind], self.books, self.config.schemas_dir)
+                    CommentaryWriter(
+                        generated_roots[kind],
+                        self.books,
+                        self.config.schemas_dir,
+                        self.config.max_document_bytes,
+                    )
                     if kind == "commentaries"
                     else DictionaryWriter(
-                        generated_roots[kind], self.books, self.config.schemas_dir
+                        generated_roots[kind],
+                        self.books,
+                        self.config.schemas_dir,
+                        self.config.max_document_bytes,
                     )
                 )
-                record, _ = writer.write(module, exported)
+                record, metadata = writer.write(module, exported)
                 summaries[kind].append(record)
                 report.built[kind].append(module.name)
+                if metadata.get("storage"):
+                    report.storage[module.name] = {
+                        "resource": kind,
+                        "id": record["id"],
+                        "entry_count": record["entry_count"],
+                        **metadata["storage"],
+                    }
             except Exception as error:
                 LOG.exception("Failed to build %s", module.name)
                 report.failed.append(

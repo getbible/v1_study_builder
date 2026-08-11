@@ -16,7 +16,14 @@ from jsonschema import validate
 from study_builder.books import BookRegistry
 from study_builder.content import extract_osis_references, public_content
 from study_builder.models import ModuleDescriptor, NativeExport
-from study_builder.util import read_json, slug, write_composed_json, write_json
+from study_builder.util import (
+    DOCUMENT_CEILING_BYTES,
+    enforce_document_ceiling,
+    read_json,
+    slug,
+    write_composed_json,
+    write_json,
+)
 
 _STRONG_KEY = re.compile(r"^(?:strong:)?([GH])?0*(\d{1,5})(?:!.*)?$", re.IGNORECASE)
 _SAFE_ENTRY_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
@@ -126,9 +133,16 @@ class DictionaryWriter:
     key has an identifier, so a single pass cannot produce a navigable link graph.
     """
 
-    def __init__(self, root: Path, books: BookRegistry, schemas_dir: Path) -> None:
+    def __init__(
+        self,
+        root: Path,
+        books: BookRegistry,
+        schemas_dir: Path,
+        max_document_bytes: int = DOCUMENT_CEILING_BYTES,
+    ) -> None:
         self.root = root
         self.books = books
+        self.max_document_bytes = max_document_bytes
         self.schema = read_json(schemas_dir / "dictionary-entry.schema.json")
 
     def write(self, module: ModuleDescriptor, exported: NativeExport) -> tuple[dict, dict]:
@@ -186,9 +200,10 @@ class DictionaryWriter:
             "entries",
             [entry_files[item.entry_id] for item in index],
         )
+        complete_bytes = enforce_document_ceiling(complete, self.max_document_bytes)
 
         metadata = self._metadata(
-            module, module_id, prefix, len(staged), unique_keys, complete.stat().st_size
+            module, module_id, prefix, len(staged), unique_keys, complete_bytes
         )
         write_json(module_root / "metadata.json", metadata)
         record = {

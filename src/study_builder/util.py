@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
@@ -11,7 +12,19 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, Any
 
+LOG = logging.getLogger(__name__)
+
 _SAFE_SLUG = re.compile(r"[^a-z0-9._-]+")
+
+# A Git remote rejects a blob above 100 MB outright and warns above 50 MB. The
+# builder holds itself below both, so an oversized document is caught here — in
+# the build, naming the file — rather than hours later in a rejected push.
+DOCUMENT_WARNING_BYTES = 50 * 1024 * 1024
+DOCUMENT_CEILING_BYTES = 95 * 1024 * 1024
+
+
+class DocumentTooLarge(RuntimeError):
+    """A generated document exceeds the size a Git remote will accept."""
 
 
 def utc_now() -> str:
@@ -76,9 +89,33 @@ def _write_indented(handle: IO[str], source: Path, prefix: str) -> None:
             handle.write(prefix + line if line else "")
 
 
+def megabytes(size: int) -> str:
+    return f"{size / 1024 / 1024:.2f} MB"
+
+
+def enforce_document_ceiling(path: Path, ceiling: int = DOCUMENT_CEILING_BYTES) -> int:
+    """Refuse to publish a document a Git remote would reject, and say which one."""
+    size = path.stat().st_size
+    if ceiling and size > ceiling:
+        raise DocumentTooLarge(
+            f"{path.name} is {megabytes(size)}, above the {megabytes(ceiling)} document "
+            "ceiling. Publishing it would be rejected by the remote. Either the source "
+            "module grew beyond what a single document can carry, or it is repeating "
+            "content that should have been collapsed."
+        )
+    if size > DOCUMENT_WARNING_BYTES:
+        LOG.warning(
+            "%s is %s, above the %s a Git remote warns about",
+            path.name,
+            megabytes(size),
+            megabytes(DOCUMENT_WARNING_BYTES),
+        )
+    return size
+
+
 def write_composed_json(
     path: Path, header: dict[str, Any], member: str, sources: Sequence[Path]
-) -> None:
+) -> int:
     """Write an envelope whose array member embeds already-written documents.
 
     The members are streamed from disk rather than held in memory, and each one is
@@ -104,6 +141,7 @@ def write_composed_json(
         handle.write("]\n}\n")
         temporary = Path(handle.name)
     os.replace(temporary, path)
+    return path.stat().st_size
 
 
 def replace_tree(source: Path, destination: Path) -> None:

@@ -12,7 +12,14 @@ from study_builder.books import BookRegistry
 from study_builder.chapter_spool import CommentaryChapterSpool
 from study_builder.content import extract_osis_references, public_content
 from study_builder.models import ModuleDescriptor, NativeExport
-from study_builder.util import read_json, slug, write_composed_json, write_json
+from study_builder.util import (
+    DOCUMENT_CEILING_BYTES,
+    enforce_document_ceiling,
+    read_json,
+    slug,
+    write_composed_json,
+    write_json,
+)
 
 # Reserved inside a commentary directory; an entry may never claim these names.
 RESERVED_DOCUMENTS = {"metadata.json", "books.json"}
@@ -26,9 +33,16 @@ class CommentaryWriter:
     at its own path and a client needs only one parser for all three levels.
     """
 
-    def __init__(self, root: Path, books: BookRegistry, schemas_dir: Path) -> None:
+    def __init__(
+        self,
+        root: Path,
+        books: BookRegistry,
+        schemas_dir: Path,
+        max_document_bytes: int = DOCUMENT_CEILING_BYTES,
+    ) -> None:
         self.root = root
         self.books = books
+        self.max_document_bytes = max_document_bytes
         self.chapter_schema = read_json(schemas_dir / "commentary-chapter.schema.json")
 
     def write(self, module: ModuleDescriptor, exported: NativeExport) -> tuple[dict, dict]:
@@ -37,11 +51,19 @@ class CommentaryWriter:
         chapter_files: dict[int, list[Path]] = defaultdict(list)
         chapter_counts: dict[int, list[tuple[int, int]]] = defaultdict(list)
         entry_count = 0
+        # Measured, not assumed: what the source offered against what is published.
+        source_entry_count = 0
+        source_text_bytes = 0
+        text_bytes = 0
+        chapter_bytes = 0
+        book_bytes = 0
 
         with CommentaryChapterSpool() as chapters:
             for source in exported.entries:
                 entry = self._entry(source)
                 if entry is not None:
+                    source_entry_count += 1
+                    source_text_bytes += len(entry["text"].encode("utf-8"))
                     chapters.append(entry)
 
             for book_number, chapter_number in chapters.coordinates():
@@ -61,9 +83,11 @@ class CommentaryWriter:
                 validate(document, self.chapter_schema)
                 path = module_root / str(book_number) / f"{chapter_number}.json"
                 write_json(path, document)
+                chapter_bytes += enforce_document_ceiling(path, self.max_document_bytes)
                 chapter_files[book_number].append(path)
                 chapter_counts[book_number].append((chapter_number, len(chapter_entries)))
                 entry_count += len(chapter_entries)
+                text_bytes += sum(len(item["text"].encode("utf-8")) for item in chapter_entries)
 
         book_files: list[Path] = []
         books_index: list[dict[str, Any]] = []
@@ -84,6 +108,7 @@ class CommentaryWriter:
                 "chapters",
                 chapter_files[book_number],
             )
+            book_bytes += enforce_document_ceiling(path, self.max_document_bytes)
             book_files.append(path)
             books_index.append(
                 {
@@ -120,10 +145,21 @@ class CommentaryWriter:
             "books",
             book_files,
         )
+        complete_bytes = enforce_document_ceiling(complete, self.max_document_bytes)
 
         chapter_count = sum(len(records) for records in chapter_counts.values())
+        storage = {
+            "source_entry_count": source_entry_count,
+            "source_text_bytes": source_text_bytes,
+            "text_bytes": text_bytes,
+            "repetition_ratio": round(source_text_bytes / text_bytes, 3) if text_bytes else 1.0,
+            "chapter_bytes": chapter_bytes,
+            "book_bytes": book_bytes,
+            "commentary_bytes": complete_bytes,
+            "published_bytes": chapter_bytes + book_bytes + complete_bytes,
+        }
         metadata = self._metadata(
-            module, module_id, len(books_index), chapter_count, entry_count, complete.stat().st_size
+            module, module_id, len(books_index), chapter_count, entry_count, storage
         )
         write_json(module_root / "metadata.json", metadata)
         record = {
@@ -154,27 +190,15 @@ class CommentaryWriter:
         content = public_content(source)
         if not content["text"]:
             return None
-        label = book.name
-        if chapter:
-            label += f" {chapter}"
-            if verse_number:
-                label += f":{verse_number}"
-        anchor: dict[str, Any] = {
+        entry: dict[str, Any] = {
             "book": book.number,
             "chapter": chapter,
             "verse": verse_number,
         }
         osis = str(verse.get("osis", ""))
         if osis:
-            anchor["osis"] = osis
-        entry: dict[str, Any] = {
-            "book": book.number,
-            "chapter": chapter,
-            "verse": verse_number,
-            "name": label,
-            "anchor": anchor,
-            **content,
-        }
+            entry["osis"] = osis
+        entry.update(content)
         related = []
         for reference in extract_osis_references(
             str(source.get("raw", "")), str(source.get("html", ""))
@@ -190,15 +214,67 @@ class CommentaryWriter:
     def _chapter_entries(
         chapters: CommentaryChapterSpool, book_number: int, chapter_number: int
     ) -> list[dict[str, Any]]:
-        seen: set[tuple[int, str]] = set()
-        collected: list[dict[str, Any]] = []
+        """Publish each distinct comment once, listing every verse it covers.
+
+        A SWORD commentary attaches one comment to a verse *range* and the extractor
+        reports that same text once per verse in the range, so writing an entry per
+        verse stored the identical paragraph dozens of times — Augustine's exposition
+        of a psalm reappeared for all 176 verses of Psalm 119. Nothing is dropped:
+        the text is published once, anchored at the lowest verse it covers, and
+        `verses` names the rest, so every verse still resolves to its comment.
+
+        Grouping stops at the chapter boundary. A chapter document is the addressable
+        unit and has to stand alone, so a comment spanning two chapters is published
+        in each of them rather than only in the first.
+        """
+        order: list[str] = []
+        anchors: dict[str, dict[str, Any]] = {}
+        covered: dict[str, set[int]] = {}
+        references: dict[str, dict[tuple[Any, ...], dict[str, Any]]] = {}
         for entry in chapters.entries(book_number, chapter_number):
-            unique = (int(entry["verse"]), str(entry.get("text", "")))
-            if unique in seen:
-                continue
-            seen.add(unique)
-            collected.append(entry)
-        collected.sort(key=lambda item: (item["verse"], item["name"]))
+            text = str(entry.get("text", ""))
+            verse = int(entry["verse"])
+            if text not in anchors:
+                order.append(text)
+                anchors[text] = entry
+                covered[text] = set()
+                references[text] = {}
+            elif verse < int(anchors[text]["verse"]):
+                # The lowest verse anchors the published entry, so its `osis` is the
+                # one the source module keyed the comment on.
+                anchors[text] = entry
+            covered[text].add(verse)
+            # A repeated comment repeats its references; union them so a range that
+            # does differ verse to verse keeps every reference it carried.
+            for reference in entry.get("references", ()):
+                references[text][
+                    (
+                        reference.get("osis", ""),
+                        reference.get("book", 0),
+                        reference.get("chapter", 0),
+                        reference.get("verse", 0),
+                    )
+                ] = reference
+
+        collected: list[dict[str, Any]] = []
+        for text in order:
+            anchor = anchors[text]
+            verses = sorted(covered[text])
+            published: dict[str, Any] = {
+                "book": int(anchor["book"]),
+                "chapter": int(anchor["chapter"]),
+                "verse": verses[0],
+            }
+            if len(verses) > 1:
+                published["verses"] = verses
+            if anchor.get("osis"):
+                published["osis"] = str(anchor["osis"])
+            published["text"] = text
+            related = [reference for _, reference in sorted(references[text].items())]
+            if related:
+                published["references"] = related
+            collected.append(published)
+        collected.sort(key=lambda item: (item["verse"], item["text"]))
         return collected
 
     @staticmethod
@@ -208,7 +284,7 @@ class CommentaryWriter:
         book_count: int,
         chapter_count: int,
         entry_count: int,
-        complete_bytes: int,
+        storage: dict[str, Any],
     ) -> dict[str, Any]:
         return {
             "schema": "getbible-commentary-metadata-v1",
@@ -224,7 +300,8 @@ class CommentaryWriter:
             "book_count": book_count,
             "chapter_count": chapter_count,
             "entry_count": entry_count,
-            "bytes": complete_bytes,
+            "bytes": storage["commentary_bytes"],
+            "storage": storage,
             "books_url": "books.json",
             "book_url_template": "{book}.json",
             "chapter_url_template": "{book}/{chapter}.json",

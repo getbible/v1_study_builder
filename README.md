@@ -71,9 +71,10 @@ and independently checks all of the rules that protect publication:
 Raw bytes remain authoritative. The adapter derives the public plain text only
 after verification and retains the original contract records internally.
 Validated entries are held in a compressed, disk-backed spool. Commentary entries
-are then normalized into disk-backed chapter buckets and emitted in canonical
-GetBible book/chapter order; this supports source modules whose versification orders
-canonical or deuterocanonical books differently. Dictionary definitions are written
+are then normalized into disk-backed chapter buckets, collapsed so that a comment
+attached to a verse range is stored once rather than once per verse, and emitted in
+canonical GetBible book/chapter order; this supports source modules whose versification
+orders canonical or deuterocanonical books differently. Dictionary definitions are written
 one at a time. Book, whole-commentary, and whole-dictionary documents are streamed
 from the documents they contain rather than assembled in memory. This keeps memory
 bounded for large modules without weakening the contract or the all-or-nothing
@@ -118,14 +119,53 @@ byte-for-byte. One client parser therefore handles all three:
       "book": 43,
       "chapter": 1,
       "verse": 1,
-      "name": "John 1:1",
-      "anchor": {"book": 43, "chapter": 1, "verse": 1, "osis": "John.1.1"},
+      "osis": "John.1.1",
       "text": "...",
       "references": [{"osis": "Gen.1.1", "book": 1, "chapter": 1, "verse": 1}]
     }
   ]
 }
 ```
+
+### One comment, stored once
+
+A SWORD commentary attaches a comment to a verse *range*, and the extractor reports
+that same text once for every verse in the range. Publishing an entry per verse
+stored the identical paragraph dozens of times — Augustine's exposition of a psalm
+reappeared under all 176 verses of Psalm 119, and the whole-commentary documents grew
+into the hundreds of megabytes without carrying any more text.
+
+Each distinct comment is therefore published **once**, anchored at the lowest verse it
+covers. When it covers more than one verse, `verses` lists every verse it applies to:
+
+```json
+{
+  "book": 19,
+  "chapter": 119,
+  "verse": 1,
+  "verses": [1, 2, 3, 4, 5, 6, 7, 8],
+  "osis": "Ps.119.1",
+  "text": "..."
+}
+```
+
+Resolving a verse is one rule: **an entry covers `verses` when that member is present,
+and `verse` alone when it is not.**
+
+```js
+const forVerse = (chapter, n) =>
+  chapter.entries.find(e => (e.verses ?? [e.verse]).includes(n))
+```
+
+Nothing is dropped by this — every verse the source commented on still resolves to its
+comment. Grouping stops at the chapter boundary, because a chapter document is the
+addressable unit and has to stand alone, so a comment spanning a chapter break is
+published in both chapters.
+
+An entry carries no `name` and no `anchor` object. Both only restated values already
+present on the entry or its chapter: `name` is the book name with `chapter:verse`, and
+`anchor` repeated `book`, `chapter`, and `verse` verbatim. `osis` — the source module's
+own key for the anchor verse — is kept as a plain member.
 
 Introductions are published, not discarded. A book introduction is chapter `0`,
 so Clarke's introduction to Daniel is `clarke/27/0.json`. A chapter introduction
@@ -134,6 +174,30 @@ is verse `0`, and appears as the first entry of its own chapter document.
 `books.json` reports which books and chapters a commentary covers, and
 `metadata.json` reports its licence, counts, and the byte size of the
 whole-commentary document so a client can decide before requesting it.
+
+`metadata.json` also carries a `storage` block, which is the build's own measurement
+of this module rather than anything a client needs:
+
+```json
+{
+  "source_entry_count": 168447,
+  "source_text_bytes": 402653184,
+  "text_bytes": 41943040,
+  "repetition_ratio": 9.6,
+  "chapter_bytes": 44040192,
+  "book_bytes": 44564480,
+  "commentary_bytes": 45088768,
+  "published_bytes": 133693440
+}
+```
+
+`repetition_ratio` is how many times the average byte of source text was repeated
+across the verse range it was attached to — the multiplier the collapse removes. The
+three `*_bytes` members are what each level of the API costs on disk.
+
+No generated document may exceed `--max-document-bytes` (default 95 MB, just under the
+100 MB a Git remote refuses). The build fails and names the file rather than producing
+a tree that is rejected at push time, hours later. Set it to `0` to disable the check.
 
 ## Dictionary API
 

@@ -75,6 +75,8 @@ class BuildReport:
     failed: list[dict[str, str]] = field(default_factory=list)
     diagnostics: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     commits: dict[str, str | None] = field(default_factory=dict)
+    # Measured per module: how much the source repeated, and what each level costs.
+    storage: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -86,6 +88,7 @@ class BuildReport:
             "skipped": self.skipped,
             "failed": self.failed,
             "diagnostics": self.diagnostics,
+            "storage": self.storage,
             "commits": self.commits,
         }
 

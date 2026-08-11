@@ -30,6 +30,24 @@ def _assert_composed(composed: list[Any], parts: list[Path], where: str) -> None
             raise RuntimeError(f"{where} does not match the document served at {path}")
 
 
+def _assert_no_repeated_text(chapter: dict[str, Any], where: Path) -> None:
+    """The whole point of the collapse: one comment is stored once, not once per verse.
+
+    Two distinct comments may still land on the same verse — a source module can emit
+    more than one record for a verse — so verse coverage is deliberately not asserted
+    to be disjoint. What must hold is that no text repeats.
+    """
+    seen: set[str] = set()
+    for entry in chapter["entries"]:
+        text = entry["text"]
+        if text in seen:
+            raise RuntimeError(f"{where} publishes the same comment more than once")
+        seen.add(text)
+        verses = entry.get("verses", [entry["verse"]])
+        if entry["verse"] != min(verses):
+            raise RuntimeError(f"{where} anchors an entry above the lowest verse it covers")
+
+
 def validate_commentary(root: Path, complete_path: Path) -> dict[str, Any]:
     metadata = read_json(root / "metadata.json")
     books = read_json(root / "books.json")
@@ -54,8 +72,9 @@ def validate_commentary(root: Path, complete_path: Path) -> dict[str, Any]:
     if chapter.get("schema") != "getbible-commentary-chapter-v1" or not chapter.get("entries"):
         raise RuntimeError("Commentary chapter produced no entries")
     first = chapter["entries"][0]
-    if not all(name in first for name in ("book", "chapter", "verse", "anchor", "text")):
+    if not all(name in first for name in ("book", "chapter", "verse", "text")):
         raise RuntimeError("Commentary entry is not linked to a Bible API coordinate")
+    _assert_no_repeated_text(chapter, chapter_paths[0])
     _reject_markup(chapter, "chapter")
 
     complete = read_json(complete_path)

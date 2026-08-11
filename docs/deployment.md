@@ -30,6 +30,9 @@ the deployment stops being safe:
 4. **Every document is plain text JSON.** No HTML is published anywhere, which
    is why the origin can send `Content-Security-Policy: default-src 'none'` and
    why no consumer has to sanitize a response.
+5. **No document exceeds `--max-document-bytes`** (95 MB by default). The build
+   fails naming the offending file rather than publishing a tree the publication
+   remote would reject, so the origin never sees a half-pushed corpus.
 
 ## Server layout
 
