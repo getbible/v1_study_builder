@@ -1,3 +1,2 @@
-bleach>=6.2,<7
 jsonschema>=4.23,<5
 

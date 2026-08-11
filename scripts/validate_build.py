@@ -10,42 +10,104 @@ from typing import Any
 from study_builder.util import read_json, slug
 
 
-def validate_commentary(root: Path) -> dict[str, Any]:
+def _reject_markup(document: Any, where: str) -> None:
+    if isinstance(document, dict):
+        if "html" in document:
+            raise RuntimeError(f"{where} still publishes an html member")
+        for key, value in document.items():
+            _reject_markup(value, f"{where}.{key}")
+    elif isinstance(document, list):
+        for index, value in enumerate(document):
+            _reject_markup(value, f"{where}[{index}]")
+
+
+def _assert_composed(composed: list[Any], parts: list[Path], where: str) -> None:
+    """A composed document must contain its parts exactly as they are served alone."""
+    if len(composed) != len(parts):
+        raise RuntimeError(f"{where} holds {len(composed)} members for {len(parts)} documents")
+    for member, path in zip(composed, parts, strict=True):
+        if member != read_json(path):
+            raise RuntimeError(f"{where} does not match the document served at {path}")
+
+
+def validate_commentary(root: Path, complete_path: Path) -> dict[str, Any]:
     metadata = read_json(root / "metadata.json")
     books = read_json(root / "books.json")
     if metadata.get("schema") != "getbible-commentary-metadata-v1":
         raise RuntimeError("Unexpected commentary metadata schema")
-    if int(metadata.get("entry_count", 0)) <= 0 or not books:
+    if books.get("schema") != "getbible-commentary-books-v1":
+        raise RuntimeError("Unexpected commentary books index schema")
+    if int(metadata.get("entry_count", 0)) <= 0 or not books.get("books"):
         raise RuntimeError("Commentary produced no addressable entries")
-    first_book = books[0]
-    book_index = read_json(root / str(first_book["url"]))
-    if not book_index.get("chapters"):
-        raise RuntimeError("Commentary book index produced no chapters")
-    chapter = read_json(root / str(book_index["chapters"][0]["url"]))
-    if chapter.get("schema") != "getbible-commentary-chapter-v1":
-        raise RuntimeError("Unexpected commentary chapter schema")
-    if not chapter.get("entries"):
+
+    first_book = books["books"][0]
+    book_path = root / f"{first_book['book']}.json"
+    book = read_json(book_path)
+    if book.get("schema") != "getbible-commentary-book-v1" or not book.get("chapters"):
+        raise RuntimeError("Commentary book document produced no chapters")
+    chapter_paths = [
+        root / str(first_book["book"]) / f"{number}.json" for number in first_book["chapters"]
+    ]
+    _assert_composed(book["chapters"], chapter_paths, f"{book_path}.chapters")
+
+    chapter = read_json(chapter_paths[0])
+    if chapter.get("schema") != "getbible-commentary-chapter-v1" or not chapter.get("entries"):
         raise RuntimeError("Commentary chapter produced no entries")
     first = chapter["entries"][0]
     if not all(name in first for name in ("book", "chapter", "verse", "anchor", "text")):
         raise RuntimeError("Commentary entry is not linked to a Bible API coordinate")
-    return {"entries": metadata["entry_count"], "books": metadata["book_count"]}
+    _reject_markup(chapter, "chapter")
+
+    complete = read_json(complete_path)
+    if complete.get("schema") != "getbible-commentary-v1":
+        raise RuntimeError("Unexpected whole-commentary schema")
+    book_paths = [root / f"{record['book']}.json" for record in books["books"]]
+    _assert_composed(complete["books"], book_paths, f"{complete_path}.books")
+
+    return {
+        "books": metadata["book_count"],
+        "chapters": metadata["chapter_count"],
+        "entries": metadata["entry_count"],
+        "bytes": metadata["bytes"],
+        "introductions": sum(1 for record in books["books"] if 0 in record["chapters"]),
+    }
 
 
-def validate_dictionary(root: Path) -> dict[str, Any]:
+def validate_dictionary(root: Path, complete_path: Path) -> dict[str, Any]:
     metadata = read_json(root / "metadata.json")
-    keys = read_json(root / "keys.json")
+    index = read_json(root / "index.json")
     if metadata.get("schema") != "getbible-dictionary-metadata-v1":
         raise RuntimeError("Unexpected dictionary metadata schema")
-    if int(metadata.get("entry_count", 0)) <= 0 or not keys:
+    if index.get("schema") != "getbible-dictionary-index-v1":
+        raise RuntimeError("Unexpected dictionary index schema")
+    if int(metadata.get("entry_count", 0)) <= 0 or not index.get("entries"):
         raise RuntimeError("Dictionary produced no addressable entries")
-    first = keys[0]
-    document = read_json(root / str(first["url"]))
+
+    terms = [record["search"] for record in index["entries"]]
+    if terms != sorted(terms):
+        raise RuntimeError("Dictionary index is not sorted by its search term")
+
+    entry_paths = [root / f"{record['id']}.json" for record in index["entries"]]
+    document = read_json(entry_paths[0])
     if document.get("schema") != "getbible-dictionary-entry-v1":
         raise RuntimeError("Unexpected dictionary entry schema")
     if not all(name in document for name in ("dictionary", "id", "key", "aliases", "text")):
         raise RuntimeError("Dictionary entry is missing its lookup contract")
-    return {"entries": metadata["entry_count"], "strong_prefix": metadata["strong_prefix"]}
+    _reject_markup(document, "entry")
+
+    complete = read_json(complete_path)
+    if complete.get("schema") != "getbible-dictionary-v1":
+        raise RuntimeError("Unexpected whole-dictionary schema")
+    _assert_composed(complete["entries"], entry_paths, f"{complete_path}.entries")
+
+    linked = sum(1 for entry in complete["entries"] if entry.get("see_also"))
+    return {
+        "entries": metadata["entry_count"],
+        "unique_keys": metadata["unique_key_count"],
+        "strong_prefix": metadata["strong_prefix"],
+        "bytes": metadata["bytes"],
+        "entries_with_links": linked,
+    }
 
 
 def main() -> int:
@@ -54,9 +116,14 @@ def main() -> int:
     parser.add_argument("--module", required=True)
     parser.add_argument("--dist-dir", type=Path, default=Path("dist"))
     args = parser.parse_args()
-    root = args.dist_dir / args.resource / "v1" / slug(args.module)
+    module_id = slug(args.module)
+    version_root = args.dist_dir / args.resource / "v1"
+    root = version_root / module_id
+    complete_path = version_root / f"{module_id}.json"
     result = (
-        validate_commentary(root) if args.resource == "commentaries" else validate_dictionary(root)
+        validate_commentary(root, complete_path)
+        if args.resource == "commentaries"
+        else validate_dictionary(root, complete_path)
     )
     print(json.dumps({"resource": args.resource, "module": args.module, **result}, indent=2))
     return 0

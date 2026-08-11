@@ -55,14 +55,14 @@ def parser() -> argparse.ArgumentParser:
         "--commentaries-repo",
         default=os.environ.get(
             "STUDY_BUILDER_COMMENTARIES_REPO",
-            "git@github.com:getbible/v1_commentaries.git",
+            "git@github.com:getbible/commentaries.git",
         ),
     )
     build.add_argument(
         "--dictionaries-repo",
         default=os.environ.get(
             "STUDY_BUILDER_DICTIONARIES_REPO",
-            "git@github.com:getbible/v1_dictionaries.git",
+            "git@github.com:getbible/dictionaries.git",
         ),
     )
     build.add_argument("--commentaries-branch", default="main")

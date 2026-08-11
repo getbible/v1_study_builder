@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -18,15 +19,40 @@ from study_builder.modules import ModuleInstaller
 from study_builder.native import SwordExporter
 from study_builder.policy import ModulePolicy
 from study_builder.util import (
+    hash_tree,
     replace_tree,
     reset_directory,
     slug,
     utc_now,
-    write_hash_sidecars,
     write_json,
 )
 
 LOG = logging.getLogger(__name__)
+
+# A module directory and its whole-module document both sit at the v1 root, so a
+# module identifier may never collide with a document the builder writes there.
+RESERVED_MODULE_IDS = frozenset({"build", "commentaries", "dictionaries", "hashes", "schema"})
+
+BASE_URLS: dict[str, str] = {
+    "commentaries": "https://commentaries.getbible.net/v1/",
+    "dictionaries": "https://dictionaries.getbible.net/v1/",
+}
+
+CATALOG_TEMPLATES: dict[str, dict[str, str]] = {
+    "commentaries": {
+        "metadata_url_template": "{commentary}/metadata.json",
+        "books_url_template": "{commentary}/books.json",
+        "commentary_url_template": "{commentary}.json",
+        "book_url_template": "{commentary}/{book}.json",
+        "chapter_url_template": "{commentary}/{book}/{chapter}.json",
+    },
+    "dictionaries": {
+        "metadata_url_template": "{dictionary}/metadata.json",
+        "index_url_template": "{dictionary}/index.json",
+        "dictionary_url_template": "{dictionary}.json",
+        "entry_url_template": "{dictionary}/{entry}.json",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -47,8 +73,8 @@ class PipelineConfig:
     pull: bool = False
     push: bool = False
     dry_run: bool = False
-    commentaries_repo: str = "git@github.com:getbible/v1_commentaries.git"
-    dictionaries_repo: str = "git@github.com:getbible/v1_dictionaries.git"
+    commentaries_repo: str = "git@github.com:getbible/commentaries.git"
+    dictionaries_repo: str = "git@github.com:getbible/dictionaries.git"
     commentaries_branch: str = "main"
     dictionaries_branch: str = "main"
 
@@ -76,12 +102,12 @@ class BuildPipeline:
         return {
             "commentaries": GitRepository(
                 self.config.commentaries_repo,
-                self.config.work_dir / "repos" / "v1_commentaries",
+                self.config.work_dir / "repos" / "commentaries",
                 self.config.commentaries_branch,
             ),
             "dictionaries": GitRepository(
                 self.config.dictionaries_repo,
-                self.config.work_dir / "repos" / "v1_dictionaries",
+                self.config.work_dir / "repos" / "dictionaries",
                 self.config.dictionaries_branch,
             ),
         }
@@ -107,7 +133,13 @@ class BuildPipeline:
             raise RuntimeError("The policy did not approve any selected modules")
         identifiers: dict[tuple[ResourceKind, str], str] = {}
         for kind, module in approved:
-            key = (kind, slug(module.name))
+            module_id = slug(module.name)
+            if module_id in RESERVED_MODULE_IDS:
+                raise RuntimeError(
+                    f"Module {module.name!r} normalizes to the reserved identifier "
+                    f"{module_id!r}, which would collide with a generated document"
+                )
+            key = (kind, module_id)
             if key in identifiers and identifiers[key] != module.name:
                 raise RuntimeError(
                     f"Module identifiers collide after normalization: "
@@ -167,19 +199,15 @@ class BuildPipeline:
                         }
                         for item in exported.diagnostics
                     ]
-                if kind == "commentaries":
-                    writer = CommentaryWriter(
-                        generated_roots[kind],
-                        self.books,
-                        self.config.schemas_dir / "commentary-chapter.schema.json",
+                writer = (
+                    CommentaryWriter(generated_roots[kind], self.books, self.config.schemas_dir)
+                    if kind == "commentaries"
+                    else DictionaryWriter(
+                        generated_roots[kind], self.books, self.config.schemas_dir
                     )
-                else:
-                    writer = DictionaryWriter(
-                        generated_roots[kind],
-                        self.config.schemas_dir / "dictionary-entry.schema.json",
-                    )
-                summary = writer.write(module, exported)
-                summaries[kind].append(summary)
+                )
+                record, _ = writer.write(module, exported)
+                summaries[kind].append(record)
                 report.built[kind].append(module.name)
             except Exception as error:
                 LOG.exception("Failed to build %s", module.name)
@@ -198,19 +226,16 @@ class BuildPipeline:
         generated_at = utc_now()
         for kind in resources:
             records = sorted(summaries[kind], key=lambda item: item["id"])
-            catalog_name = kind
-            base_url = (
-                "https://commentaries.getbible.net/v1/"
-                if kind == "commentaries"
-                else "https://dictionaries.getbible.net/v1/"
-            )
+            self._publish_schemas(generated_roots[kind], kind)
             write_json(
-                generated_roots[kind] / f"{catalog_name}.json",
+                generated_roots[kind] / f"{kind}.json",
                 {
                     "schema": f"getbible-{kind}-catalog-v1",
                     "version": 1,
                     "generated_at": generated_at,
-                    "base_url": base_url,
+                    "base_url": BASE_URLS[kind],
+                    **CATALOG_TEMPLATES[kind],
+                    "module_count": len(records),
                     kind: records,
                 },
             )
@@ -229,12 +254,16 @@ class BuildPipeline:
                     "module_count": len(records),
                 },
             )
-            hashes = write_hash_sidecars(generated_roots[kind])
+            # hashes.json covers every other generated document and is therefore
+            # also the manifest of the paths this build owns.
             write_json(
                 generated_roots[kind] / "hashes.json",
-                {"algorithm": "sha256", "files": hashes},
+                {
+                    "schema": "getbible-hashes-v1",
+                    "algorithm": "sha256",
+                    "files": hash_tree(generated_roots[kind], exclude={"hashes.json"}),
+                },
             )
-            write_hash_sidecars(generated_roots[kind])
             dist_root = self.config.dist_dir / kind / "v1"
             replace_tree(generated_roots[kind], dist_root)
 
@@ -253,6 +282,15 @@ class BuildPipeline:
         report.completed_at = utc_now()
         self._write_report(report)
         return report
+
+    def _publish_schemas(self, root: Path, kind: ResourceKind) -> None:
+        """Serve the document schemas alongside the data so every $id resolves."""
+        prefix = "commentary" if kind == "commentaries" else "dictionary"
+        destination = root / "schema"
+        destination.mkdir(parents=True, exist_ok=True)
+        for source in sorted(self.config.schemas_dir.glob(f"{prefix}*.schema.json")):
+            name = source.name.removesuffix(".schema.json") + ".json"
+            shutil.copyfile(source, destination / name)
 
     def _write_report(self, report: BuildReport) -> None:
         write_json(self.config.work_dir / "reports" / "latest.json", report.as_dict())

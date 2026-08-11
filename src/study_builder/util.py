@@ -6,9 +6,10 @@ import os
 import re
 import shutil
 import tempfile
+from collections.abc import Collection, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 _SAFE_SLUG = re.compile(r"[^a-z0-9._-]+")
 
@@ -52,16 +53,57 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def write_hash_sidecars(root: Path) -> dict[str, str]:
+def hash_tree(root: Path, *, exclude: Collection[str] = ()) -> dict[str, str]:
+    """Digest every generated document. Also the manifest of builder-owned paths."""
+    excluded = set(exclude)
     hashes: dict[str, str] = {}
     for path in sorted(root.rglob("*.json")):
         relative = path.relative_to(root).as_posix()
-        data = path.read_bytes()
-        sha1 = hashlib.sha1(data, usedforsecurity=False).hexdigest()
-        sha256 = hashlib.sha256(data).hexdigest()
-        path.with_suffix(path.suffix + ".sha").write_text(sha1 + "\n", encoding="ascii")
-        hashes[relative] = sha256
+        if relative in excluded:
+            continue
+        hashes[relative] = sha256_file(path)
     return hashes
+
+
+def _write_indented(handle: IO[str], source: Path, prefix: str) -> None:
+    first = True
+    with source.open(encoding="utf-8") as reader:
+        for raw in reader:
+            line = raw.rstrip("\n")
+            if not first:
+                handle.write("\n")
+            first = False
+            handle.write(prefix + line if line else "")
+
+
+def write_composed_json(
+    path: Path, header: dict[str, Any], member: str, sources: Sequence[Path]
+) -> None:
+    """Write an envelope whose array member embeds already-written documents.
+
+    The members are streamed from disk rather than held in memory, and each one is
+    embedded byte-for-byte. A composed document therefore contains its parts exactly
+    as they are served individually, so one client parser handles every zoom level.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if member in header:
+        raise ValueError(f"Composed member {member!r} is already present in the envelope")
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False, prefix=f".{path.name}."
+    ) as handle:
+        opening = stable_json(header).rstrip()
+        handle.write(opening[:-1].rstrip())
+        if header:
+            handle.write(",")
+        handle.write(f'\n  "{member}": [')
+        for index, source in enumerate(sources):
+            handle.write(",\n" if index else "\n")
+            _write_indented(handle, source, "    ")
+        if sources:
+            handle.write("\n  ")
+        handle.write("]\n}\n")
+        temporary = Path(handle.name)
+    os.replace(temporary, path)
 
 
 def replace_tree(source: Path, destination: Path) -> None:

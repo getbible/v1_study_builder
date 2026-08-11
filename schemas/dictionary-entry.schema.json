@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dictionaries.getbible.net/schema/v1/dictionary-entry.json",
   "title": "GetBible Dictionary Entry v1",
+  "description": "One word of one dictionary. see_also lists the words this entry points at; backlinks lists the words that point back.",
   "type": "object",
   "required": ["schema", "dictionary", "language", "id", "key", "occurrence", "aliases", "text"],
   "properties": {
@@ -13,8 +14,36 @@
     "occurrence": {"type": "integer", "minimum": 1},
     "aliases": {"type": "array", "items": {"type": "string"}, "minItems": 1},
     "text": {"type": "string"},
-    "html": {"type": "string"},
-    "references": {"type": "array", "items": {"type": "string"}}
+    "see_also": {"$ref": "#/$defs/links"},
+    "backlinks": {"$ref": "#/$defs/links"},
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["osis", "book", "chapter"],
+        "properties": {
+          "osis": {"type": "string", "minLength": 1},
+          "book": {"type": "integer", "minimum": 1, "maximum": 83},
+          "chapter": {"type": "integer", "minimum": 0},
+          "verse": {"type": "integer", "minimum": 0}
+        },
+        "additionalProperties": false
+      }
+    }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "key"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "key": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  }
 }
