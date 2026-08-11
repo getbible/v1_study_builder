@@ -224,6 +224,24 @@ The static output is the system of record. Nginx and a CDN can serve direct
 lookups without an application process, database connection pool, or request
 throttling bottleneck.
 
+## Deployment
+
+A production origin is a pull, a verify, a compress, and a sync:
+
+```bash
+scripts/deploy_static_api.sh \
+    --repo git@github.com:getbible/commentaries.git \
+    --root /var/www/getbible/commentaries \
+    --require-signature
+
+scripts/verify_live_api.sh https://commentaries.getbible.net
+```
+
+The whole tree is checked against `hashes.json` before it reaches the live root,
+so a failed build leaves the previous one serving. `docs/nginx/` holds the origin
+configuration for both hosts and `docs/deployment.md` describes the server
+layout, the caching model, the CDN and security posture, and rollback.
+
 ## Local development
 
 ```bash

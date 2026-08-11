@@ -33,3 +33,12 @@ jobs:
           study-builder --help
           study-builder engine --help
           study-builder build --help
+      - name: Lint deployment scripts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck --severity=style scripts/*.sh
+      - name: Check the origin configuration parses
+        run: |
+          sudo apt-get install -y -qq nginx
+          bash tests/nginx_config_check.sh
