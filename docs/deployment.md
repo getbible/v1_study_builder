@@ -135,6 +135,19 @@ build workflow signs its commits when the publication secrets are present, so on
 a production origin this should always be on: it means the origin serves only
 what the build key signed.
 
+It verifies against the deploying user's own GPG keyring, so import and trust
+the build key once on each origin before enabling it — otherwise every deploy
+fails closed with an unsigned-commit error:
+
+```bash
+sudo -u deploy gpg --import getbible-build-key.asc
+sudo -u deploy gpg --lsign-key <key-id>
+```
+
+Verification covers every file, not only the JSON documents: anything present in
+a version directory that `hashes.json` does not list fails the deploy. A stray
+`.html` or `.js` would otherwise be served from the API's own hostname.
+
 Use `--dry-run` to see the exact change set without touching the live root.
 
 ### Automating it
