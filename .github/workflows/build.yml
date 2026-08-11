@@ -88,8 +88,8 @@ jobs:
           RESOURCE: ${{ github.event_name == 'schedule' && 'all' || inputs.resource }}
           REFRESH: ${{ github.event_name == 'workflow_dispatch' && inputs.refresh || 'false' }}
           PUBLISH: ${{ steps.publication.outputs.enabled }}
-          STUDY_BUILDER_COMMENTARIES_REPO: ${{ secrets.GETBIBLE_COMMENTARIES_REPO || 'git@github.com:getbible/v1_commentaries.git' }}
-          STUDY_BUILDER_DICTIONARIES_REPO: ${{ secrets.GETBIBLE_DICTIONARIES_REPO || 'git@github.com:getbible/v1_dictionaries.git' }}
+          STUDY_BUILDER_COMMENTARIES_REPO: ${{ secrets.GETBIBLE_COMMENTARIES_REPO || 'git@github.com:getbible/commentaries.git' }}
+          STUDY_BUILDER_DICTIONARIES_REPO: ${{ secrets.GETBIBLE_DICTIONARIES_REPO || 'git@github.com:getbible/dictionaries.git' }}
           STUDY_BUILDER_SIGN_COMMITS: ${{ steps.publication.outputs.enabled }}
         shell: bash
         run: |
