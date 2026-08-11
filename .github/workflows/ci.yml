@@ -37,8 +37,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq shellcheck
-          shellcheck --severity=style scripts/*.sh
-      - name: Check the origin configuration parses
+          shellcheck --severity=style scripts/*.sh tests/*.sh
+      - name: Install, deploy, and serve the origin configuration
         run: |
           sudo apt-get install -y -qq nginx
-          bash tests/nginx_config_check.sh
+          sudo --preserve-env=PATH bash tests/nginx_config_check.sh
