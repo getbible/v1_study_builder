@@ -10,7 +10,9 @@ publication workflow.
 - Runtime: Python 3.12.
 - Extractor: the separately released `getbiblesword` executable, pinned in
   `conf/getbiblesword.json` and invoked only as a subprocess.
-- Outputs: static JSON trees for `v1_commentaries` and `v1_dictionaries`.
+- Outputs: static JSON trees under `v1/` in `getbible/commentaries` and
+  `getbible/dictionaries`. The version lives in the folder, not the repository
+  name, so a future `v2/` can be published beside it.
 
 This repository does not build or link the CrossWire SWORD C++ engine. Changes to
 that engine belong in `getbible/getbiblesword`. Do not reintroduce a local C++
@@ -32,20 +34,41 @@ Never use a `utf8` convenience field as the authoritative value. Decode `base64`
 verify it, then create the public text projection. Unknown additive fields must be
 retained in the internal source record. Validated entries remain disk-backed and
 writers stream them; do not restore whole-module entry or commentary collections in
-memory. A missing footer, failed digest, failed artifact, unsupported major contract,
-or extractor error blocks all publication.
+memory. Composed documents are streamed from the documents they embed, never built
+up as one object. A missing footer, failed digest, failed artifact, unsupported major
+contract, or extractor error blocks all publication.
 
 ## API stability
 
-Commentary files remain addressable by GetBible book number and chapter. Dictionary
-Strong's keys remain compatible with Bible API v3 (`G3056`, `H0430`). Any breaking
-path or document change requires a new API version; do not silently mutate v1.
+The published API is plain text. No document may reintroduce an `html` member, and
+the builder must not grow an HTML sanitizer; the value of the text-only contract is
+that no consumer has to sanitize a response.
+
+Commentary files remain addressable by GetBible book number and chapter. Chapter `0`
+is a book introduction and verse `0` a chapter introduction; neither may be dropped.
+Book and whole-commentary documents embed their parts byte-for-byte, so
+`book.chapters[n]` must stay identical to the chapter document served on its own —
+`scripts/validate_build.py` asserts this and it is the property clients rely on.
+
+Dictionary Strong's keys remain compatible with Bible API v3 (`G3056`, `H0430`).
 Repeated dictionary keys retain the unsuffixed direct path for their first
 definition; later definitions use deterministic `--2`, `--3`, and subsequent
-suffixes and must all remain discoverable through `keys.json`.
+suffixes and must all remain discoverable through `index.json`, which stays sorted
+by its `search` term. Cross-references between words resolve only to keys that
+exist in the same dictionary.
+
+A module identifier may never collide with a document at the `v1/` root; see
+`RESERVED_MODULE_IDS`. Any breaking path or document change requires a new API
+version; do not silently mutate v1.
 
 Generated repositories are replace-only outputs. A partial `--module` build may be
 used for tests but must never be pushed.
+
+## Commits
+
+Commits in this repository are authored in the maintainer's name. Do not add a
+`Co-Authored-By` trailer, a session link, an assistant name, or any other
+tool attribution to a commit message, tag, or pull request.
 
 ## Verification
 

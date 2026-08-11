@@ -5,12 +5,15 @@
 `v1_study_builder` converts policy-approved CrossWire SWORD commentary and
 dictionary modules into two independently deployable static JSON APIs:
 
-- `https://commentaries.getbible.net/v1/` from `getbible/v1_commentaries`
-- `https://dictionaries.getbible.net/v1/` from `getbible/v1_dictionaries`
+- `https://commentaries.getbible.net/v1/` from `getbible/commentaries`
+- `https://dictionaries.getbible.net/v1/` from `getbible/dictionaries`
 
 The Bible API v3 builder remains unchanged. Study Builder deliberately uses the
 same book numbers, chapters, verses, and Strong's keys so a client can move from a
 Bible response to commentary or dictionary data with a direct path lookup.
+
+Every document is plain text. Nothing in either API publishes HTML, so a consuming
+application never has to sanitize a response before rendering it.
 
 ## Repository boundaries
 
@@ -18,8 +21,8 @@ Bible response to commentary or dictionary data with a direct path lookup.
 | --- | --- | --- |
 | `getbible/getbiblesword` | Official SWORD C++ extraction and deterministic NDJSON | Released Linux executable |
 | `getbible/v1_study_builder` | Download policy, strict contract validation, normalization, schemas, and publication | Python 3.12 at build time |
-| `getbible/v1_commentaries` | Generated commentary JSON under `v1/` | Nginx/CDN only |
-| `getbible/v1_dictionaries` | Generated dictionary JSON under `v1/` | Nginx/CDN only |
+| `getbible/commentaries` | Generated commentary JSON under `v1/` | Nginx/CDN only |
+| `getbible/dictionaries` | Generated dictionary JSON under `v1/` | Nginx/CDN only |
 
 Study Builder does not contain C++, link `libsword`, use a Python SWORD binding, or
 parse a module's binary driver format. `getbiblesword` is a separately versioned
@@ -65,30 +68,42 @@ and independently checks all of the rules that protect publication:
 - exact stream SHA-256 over every line before the footer, including LF;
 - exact footer record/entry/artifact/byte counts and `success: true`.
 
-Raw bytes remain authoritative. The adapter derives safe text/HTML for the public
-API only after verification and retains the original contract records internally.
+Raw bytes remain authoritative. The adapter derives the public plain text only
+after verification and retains the original contract records internally.
 Validated entries are held in a compressed, disk-backed spool. Commentary entries
 are then normalized into disk-backed chapter buckets and emitted in canonical
 GetBible book/chapter order; this supports source modules whose versification orders
 canonical or deuterocanonical books differently. Dictionary definitions are written
-one at a time. This keeps memory bounded for large modules without weakening the
-contract or the all-or-nothing publication rule. Any missing footer, checksum
-failure, failed diagnostic, extractor error, or classification mismatch stops the
-complete build before publication.
+one at a time. Book, whole-commentary, and whole-dictionary documents are streamed
+from the documents they contain rather than assembled in memory. This keeps memory
+bounded for large modules without weakening the contract or the all-or-nothing
+publication rule. Any missing footer, checksum failure, failed diagnostic,
+extractor error, or classification mismatch stops the complete build before
+publication.
 
 ## Commentary API
 
 ```text
 GET https://commentaries.getbible.net/v1/commentaries.json
+GET https://commentaries.getbible.net/v1/{commentary}.json
 GET https://commentaries.getbible.net/v1/{commentary}/metadata.json
 GET https://commentaries.getbible.net/v1/{commentary}/books.json
 GET https://commentaries.getbible.net/v1/{commentary}/{book}.json
 GET https://commentaries.getbible.net/v1/{commentary}/{book}/{chapter}.json
 ```
 
-The chapter path is the primary high-volume endpoint. `book` is the GetBible API
-v3 numeric identifier: Genesis is `1`, Matthew `40`, and Revelation `66`. Each
-entry contains its natural Bible coordinate:
+`book` is the GetBible API v3 numeric identifier: Genesis is `1`, Daniel `27`,
+Matthew `40`, and Revelation `66`. Deuterocanonical books continue to `83`.
+
+The three content levels are self-similar. A chapter document is one member of a
+book document, which is one member of a whole-commentary document, embedded
+byte-for-byte. One client parser therefore handles all three:
+
+```text
+{commentary}/{book}/{chapter}.json    one chapter, the high-volume endpoint
+{commentary}/{book}.json             every chapter of that book
+{commentary}.json                    every book of that commentary
+```
 
 ```json
 {
@@ -106,23 +121,40 @@ entry contains its natural Bible coordinate:
       "name": "John 1:1",
       "anchor": {"book": 43, "chapter": 1, "verse": 1, "osis": "John.1.1"},
       "text": "...",
-      "html": "<p>...</p>"
+      "references": [{"osis": "Gen.1.1", "book": 1, "chapter": 1, "verse": 1}]
     }
   ]
 }
 ```
 
-Book and chapter introductions use chapter or verse `0`; they are not discarded.
+Introductions are published, not discarded. A book introduction is chapter `0`,
+so Clarke's introduction to Daniel is `clarke/27/0.json`. A chapter introduction
+is verse `0`, and appears as the first entry of its own chapter document.
+
+`books.json` reports which books and chapters a commentary covers, and
+`metadata.json` reports its licence, counts, and the byte size of the
+whole-commentary document so a client can decide before requesting it.
 
 ## Dictionary API
 
 ```text
 GET https://dictionaries.getbible.net/v1/dictionaries.json
+GET https://dictionaries.getbible.net/v1/{dictionary}.json
 GET https://dictionaries.getbible.net/v1/{dictionary}/metadata.json
-GET https://dictionaries.getbible.net/v1/{dictionary}/keys.json
+GET https://dictionaries.getbible.net/v1/{dictionary}/index.json
 GET https://dictionaries.getbible.net/v1/{dictionary}/{entry}.json
-GET https://dictionaries.getbible.net/v1/{dictionary}/indexes/{sha256-prefix}.json
 ```
+
+Searching a dictionary takes two requests. `index.json` lists every word once,
+sorted by an accent-insensitive lowercase `search` term, so a client can fetch it
+once and then search, prefix-match, or binary-search entirely in memory:
+
+```json
+{"id": "k-KADESH", "key": "KADESH", "search": "kadesh"}
+```
+
+The record's `id` is the path of the word itself — `{entry}.json` — so a hit in
+the index resolves to exactly one document with no further lookup.
 
 Strong's paths match Bible API v3 tokens directly:
 
@@ -133,16 +165,47 @@ H0430 -> https://dictionaries.getbible.net/v1/strongshebrew/H0430.json
 
 Greek keys use `G` plus the unpadded number; Hebrew keys use `H0` plus the
 unpadded number. Other dictionary keys receive deterministic, path-safe IDs.
-`keys.json` maps source keys and aliases, while 256 SHA-256-prefix shards provide
-smaller lookup indexes for constrained clients.
+
+Each word document carries the dictionary's own link graph, so a client can
+navigate in either direction without rebuilding an index:
+
+```json
+{
+  "schema": "getbible-dictionary-entry-v1",
+  "dictionary": "easton",
+  "id": "k-KADESH",
+  "key": "KADESH",
+  "occurrence": 1,
+  "aliases": ["KADESH"],
+  "text": "Holy; a place in the wilderness of Zin.",
+  "see_also": [{"id": "k-MERIBAH", "key": "MERIBAH"}],
+  "backlinks": [{"id": "k-ZIN", "key": "ZIN"}],
+  "references": [{"osis": "Num.20.1", "book": 4, "chapter": 20, "verse": 1}]
+}
+```
+
+`see_also` lists the words this entry points at and `backlinks` the words that
+point back. Only targets that resolve to a real key in the same dictionary are
+published. Scripture references stay in `references`, in the same shape the
+commentary API uses.
 
 Some SWORD dictionaries legitimately contain more than one definition for the
 same public key. The first definition keeps the canonical direct path, and later
 definitions receive deterministic `--2`, `--3`, and subsequent suffixes. For
 example, Easton's repeated `KADESH` records are available as `k-KADESH.json` and
-`k-KADESH--2.json`. Every definition appears in `keys.json` with an `occurrence`
+`k-KADESH--2.json`. Every definition appears in `index.json` with an `occurrence`
 value. Dictionary metadata reports both the total `entry_count` and the distinct
 `unique_key_count`.
+
+`{dictionary}.json` is the complete dictionary in index order, for offline
+clients that would otherwise request every word individually.
+
+## Integrity and schemas
+
+Each API root publishes `hashes.json`, a SHA-256 digest of every other generated
+document, which is also the manifest of the paths a build owns. The JSON Schemas
+for every document type are served beside the data under `v1/schema/`, so each
+schema `$id` resolves to the document that defines it.
 
 ## Build flow
 
@@ -152,9 +215,9 @@ flowchart TD
     B --> C["NDJSON v1 subprocess stream"]
     C --> D["Independent stream + artifact validator"]
     D --> E["Python API adapter + JSON Schema"]
-    E --> F["Atomic static v1 trees + hash sidecars"]
-    F --> G["v1_commentaries, when publication secrets exist"]
-    F --> H["v1_dictionaries, when publication secrets exist"]
+    E --> F["Atomic static v1 trees + SHA-256 manifest"]
+    F --> G["commentaries, when publication secrets exist"]
+    F --> H["dictionaries, when publication secrets exist"]
 ```
 
 The static output is the system of record. Nginx and a CDN can serve direct
@@ -232,8 +295,8 @@ Publication secret set:
 | `GETBIBLE_SSH_KEY` | SSH private key with write access to both outputs |
 | `GETBIBLE_SSH_PUB` | Matching public key |
 
-The default output remotes are `getbible/v1_commentaries` and
-`getbible/v1_dictionaries`. Optional `GETBIBLE_COMMENTARIES_REPO` and
+The default output remotes are `getbible/commentaries` and
+`getbible/dictionaries`. Optional `GETBIBLE_COMMENTARIES_REPO` and
 `GETBIBLE_DICTIONARIES_REPO` secrets may select staging remotes.
 
 ## Redistribution policy

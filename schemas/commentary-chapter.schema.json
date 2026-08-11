@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://commentaries.getbible.net/schema/v1/commentary-chapter.json",
   "title": "GetBible Commentary Chapter v1",
+  "description": "One chapter of one commentary. Chapter 0 carries the book introduction and verse 0 carries a chapter introduction.",
   "type": "object",
   "required": ["schema", "commentary", "language", "book", "name", "chapter", "entries"],
   "properties": {
@@ -10,35 +11,51 @@
     "language": {"type": "string", "minLength": 2},
     "book": {"type": "integer", "minimum": 1, "maximum": 83},
     "name": {"type": "string", "minLength": 1},
-    "chapter": {"type": "integer", "minimum": 1},
+    "chapter": {"type": "integer", "minimum": 0},
     "entries": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/entry"}
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["book", "chapter", "verse", "name", "anchor", "text"],
+      "properties": {
+        "book": {"type": "integer", "minimum": 1, "maximum": 83},
+        "chapter": {"type": "integer", "minimum": 0},
+        "verse": {"type": "integer", "minimum": 0},
+        "name": {"type": "string"},
+        "anchor": {
+          "type": "object",
+          "required": ["book", "chapter", "verse"],
+          "properties": {
+            "book": {"type": "integer", "minimum": 1, "maximum": 83},
+            "chapter": {"type": "integer", "minimum": 0},
+            "verse": {"type": "integer", "minimum": 0},
+            "osis": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
+        "text": {"type": "string"},
+        "references": {"$ref": "#/$defs/references"}
+      },
+      "additionalProperties": false
+    },
+    "references": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["book", "chapter", "verse", "name", "anchor", "text"],
+        "required": ["osis", "book", "chapter"],
         "properties": {
+          "osis": {"type": "string", "minLength": 1},
           "book": {"type": "integer", "minimum": 1, "maximum": 83},
-          "chapter": {"type": "integer", "minimum": 1},
-          "verse": {"type": "integer", "minimum": 0},
-          "name": {"type": "string"},
-          "anchor": {
-            "type": "object",
-            "required": ["book", "chapter", "verse"],
-            "properties": {
-              "book": {"type": "integer"},
-              "chapter": {"type": "integer", "minimum": 1},
-              "verse": {"type": "integer"},
-              "osis": {"type": "string"}
-            },
-            "additionalProperties": false
-          },
-          "text": {"type": "string"},
-          "html": {"type": "string"},
-          "references": {"type": "array", "items": {"type": "object"}}
+          "chapter": {"type": "integer", "minimum": 0},
+          "verse": {"type": "integer", "minimum": 0}
         },
         "additionalProperties": false
       }
     }
-  },
-  "additionalProperties": false
+  }
 }

@@ -6,7 +6,7 @@ def test_build_cli_defaults_to_both_resources() -> None:
     assert args.resource == "all"
     assert args.dry_run
     assert args.engine is None
-    assert args.commentaries_repo.endswith("getbible/v1_commentaries.git")
-    assert args.dictionaries_repo.endswith("getbible/v1_dictionaries.git")
+    assert args.commentaries_repo.endswith("getbible/commentaries.git")
+    assert args.dictionaries_repo.endswith("getbible/dictionaries.git")
     assert args.commentaries_branch == "main"
     assert args.dictionaries_branch == "main"

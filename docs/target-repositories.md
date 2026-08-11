@@ -1,13 +1,14 @@
 # Target repository setup
 
-Create two empty repositories with `main` as their default branch:
+Create two repositories with `main` as their default branch:
 
-- `getbible/v1_commentaries`
-- `getbible/v1_dictionaries`
+- `getbible/commentaries`
+- `getbible/dictionaries`
 
 Seed each repository with a README and commit it before the first builder run.
 The builder owns only the `v1/` directory; repository documentation and server
-configuration outside that directory are preserved.
+configuration outside that directory are preserved, and a future `v2/` can be
+published beside it without disturbing v1 consumers.
 
 Add these Actions secrets to `v1_study_builder`:
 
