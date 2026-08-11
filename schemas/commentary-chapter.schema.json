@@ -21,22 +21,27 @@
   "$defs": {
     "entry": {
       "type": "object",
-      "required": ["book", "chapter", "verse", "name", "anchor", "text"],
+      "description": "One comment. A source module attaches a comment to a verse range and repeats it for every verse in that range; it is published once here, anchored at the lowest verse it covers, with `verses` listing every verse it applies to when that is more than one.",
+      "required": ["book", "chapter", "verse", "text"],
       "properties": {
         "book": {"type": "integer", "minimum": 1, "maximum": 83},
         "chapter": {"type": "integer", "minimum": 0},
-        "verse": {"type": "integer", "minimum": 0},
-        "name": {"type": "string"},
-        "anchor": {
-          "type": "object",
-          "required": ["book", "chapter", "verse"],
-          "properties": {
-            "book": {"type": "integer", "minimum": 1, "maximum": 83},
-            "chapter": {"type": "integer", "minimum": 0},
-            "verse": {"type": "integer", "minimum": 0},
-            "osis": {"type": "string"}
-          },
-          "additionalProperties": false
+        "verse": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The lowest verse this comment covers."
+        },
+        "verses": {
+          "type": "array",
+          "description": "Every verse this comment covers, including `verse`. Absent when it covers only `verse`.",
+          "items": {"type": "integer", "minimum": 0},
+          "minItems": 2,
+          "uniqueItems": true
+        },
+        "osis": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The source module's own key for the anchor verse."
         },
         "text": {"type": "string"},
         "references": {"$ref": "#/$defs/references"}

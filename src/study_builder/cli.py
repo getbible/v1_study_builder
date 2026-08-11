@@ -11,7 +11,7 @@ from study_builder.engine import GetBibleSwordManager
 from study_builder.http import HttpClient
 from study_builder.pipeline import BuildPipeline, PipelineConfig
 from study_builder.policy import ModulePolicy
-from study_builder.util import reset_directory
+from study_builder.util import DOCUMENT_CEILING_BYTES, reset_directory
 
 
 def repository_root() -> Path:
@@ -64,6 +64,14 @@ def parser() -> argparse.ArgumentParser:
             "STUDY_BUILDER_DICTIONARIES_REPO",
             "git@github.com:getbible/dictionaries.git",
         ),
+    )
+    build.add_argument(
+        "--max-document-bytes",
+        type=int,
+        default=int(
+            os.environ.get("STUDY_BUILDER_MAX_DOCUMENT_BYTES", DOCUMENT_CEILING_BYTES) or 0
+        ),
+        help="Fail the build rather than publish a document above this size (0 disables)",
     )
     build.add_argument("--commentaries-branch", default="main")
     build.add_argument("--dictionaries-branch", default="main")
@@ -122,6 +130,7 @@ def _build(args: argparse.Namespace) -> int:
         dictionaries_repo=args.dictionaries_repo,
         commentaries_branch=args.commentaries_branch,
         dictionaries_branch=args.dictionaries_branch,
+        max_document_bytes=args.max_document_bytes,
     )
     report = BuildPipeline(config).run()
     print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
