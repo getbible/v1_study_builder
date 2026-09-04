@@ -425,6 +425,21 @@ def test_a_prose_list_stops_where_the_markup_takes_over(english) -> None:
     ]
 
 
+def test_markup_display_text_is_found_across_a_line_break(english) -> None:
+    text = "see Gen\n1:1 and Gen 2:2 [n] there"
+    items = english.extract(
+        text,
+        markup=[
+            MarkupReference("passage", "Gen 1:1", "Gen 1:1"),
+            MarkupReference("passage", "Gen 2:2", "Gen 2:2 [n]"),
+        ],
+    )
+    assert [(item["text"], item["ref"]) for item in items] == [
+        ("Gen\n1:1", "Genesis 1:1"),
+        ("Gen 2:2 [n]", "Genesis 2:2"),
+    ]
+
+
 def test_unresolvable_markup_still_shields_its_text_from_prose_reading(english) -> None:
     # The passage names a book the API has no translation for, so nothing is published
     # for it, but "9:20" must not then be read as the previous book's chapter.

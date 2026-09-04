@@ -62,7 +62,8 @@ _OSIS_REF = re.compile(
     r"(?P<book>[1-4]?[A-Za-z][A-Za-z0-9]+)\.(?P<chapter>\d+)(?:\.(?P<verse>\d+))?"
 )
 _SWORD_URI = re.compile(r"sword://(?P<value>[^\s\"'<>]+)", re.IGNORECASE)
-_HORIZONTAL_SPACE = re.compile(r"[ \t   ]+")
+# Every horizontal white space character, whatever its script: \s is Unicode-aware.
+_HORIZONTAL_SPACE = re.compile(r"[^\S\n]+")
 _BLANK_LINES = re.compile(r"\n{3,}")
 _NOTE_SPACE = re.compile(r" \[\s*\]\s?")
 
@@ -71,17 +72,17 @@ _NOTE_SPACE = re.compile(r" \[\s*\]\s?")
 # and the sword://Bible/ link any of them may use. The rendered form spells them all
 # one way, as passagestudy.jsp showRef anchors, which is read as well.
 _REFERENCE_TAG = re.compile(
-    r"<(?P<tag>reference|ref|scripRef)\b(?P<attrs>[^>]*)>(?P<inner>.*?)</(?P=tag)\s*>",
+    r"<(?P<tag>reference|ref|scripRef)\b(?P<attrs>[^>]*?)(?:/>|>(?P<inner>.*?)</(?P=tag)\s*>)",
     re.IGNORECASE | re.DOTALL,
 )
 _ANCHOR = re.compile(
-    r"<a\b(?P<attrs>[^>]*)>(?P<inner>.*?)</a\s*>",
+    r"<a\b(?P<attrs>[^>]*?)(?:/>|>(?P<inner>.*?)</a\s*>)",
     re.IGNORECASE | re.DOTALL,
 )
+_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _ATTRIBUTE = re.compile(
     r"""(?P<name>[A-Za-z][A-Za-z0-9:_-]*)\s*=\s*(?:"(?P<dq>[^"]*)"|'(?P<sq>[^']*)')"""
 )
-_TAG = re.compile(r"<[^>]*>")
 
 
 class _MarkupStripper(HTMLParser):
@@ -212,8 +213,9 @@ def _attributes(value: str) -> dict[str, str]:
     }
 
 
-def _display(inner: str) -> str:
-    return " ".join(html.unescape(_TAG.sub(" ", inner)).split())
+def _display(inner: str | None) -> str:
+    """The words a reference shows, projected as the text is so they can be found in it."""
+    return " ".join(thml_text(inner or "").split())
 
 
 def _bible_target(value: str) -> str | None:
@@ -253,7 +255,15 @@ def extract_markup_references(*values: str) -> list[MarkupReference]:
         seen.add(key)
         found.append(MarkupReference(kind, value, display))
 
+    def kind_of(reference: str) -> str:
+        head = reference.split()[0].split("-")[0]
+        return "osis" if _OSIS_REF.fullmatch(head) else "passage"
+
     for value in values:
+        # Comments carry no live markup, and every kind of tag is read in the order the
+        # document has them, so their display texts are located in the text in turn.
+        value = _COMMENT.sub(" ", value)
+        located: list[tuple[int, str, str, str]] = []
         for match in _REFERENCE_TAG.finditer(value):
             attrs = _attributes(match.group("attrs"))
             display = _display(match.group("inner"))
@@ -261,19 +271,19 @@ def extract_markup_references(*values: str) -> list[MarkupReference]:
             if tag == "scripref":
                 parsed = attrs.get("parsed", "").replace("|", " ").strip()
                 if parsed:
-                    add("osis", parsed, display)
+                    located.append((match.start(), "osis", parsed, display))
                 elif attrs.get("passage", "").strip():
-                    add("passage", attrs["passage"], display)
+                    located.append((match.start(), "passage", attrs["passage"], display))
                 elif display:
-                    add("passage", display, display)
+                    located.append((match.start(), "passage", display, display))
                 continue
             osis = attrs.get("osisref", "").strip()
             if osis:
-                add("osis", osis, display)
+                located.append((match.start(), "osis", osis, display))
                 continue
             target = _bible_target(attrs.get("target", ""))
-            if target and _OSIS_REF.search(target):
-                add("osis", target, display)
+            if target:
+                located.append((match.start(), kind_of(target), target, display))
         for match in _ANCHOR.finditer(value):
             attrs = _attributes(match.group("attrs"))
             href = attrs.get("href", "")
@@ -281,21 +291,17 @@ def extract_markup_references(*values: str) -> list[MarkupReference]:
             lowered = href.casefold()
             if lowered.startswith("sword://"):
                 target = _bible_target(href)
-                if target and _OSIS_REF.search(target):
-                    add("osis", target, display)
+                if target:
+                    located.append((match.start(), kind_of(target), target, display))
                 continue
             if "action=showref" not in lowered:
                 continue
             query = parse_qs(urlsplit(href.replace("&amp;", "&")).query)
             reference = " ".join(query.get("value", [""])).strip()
-            if not reference:
-                continue
-            if _OSIS_REF.fullmatch(reference.split()[0]) or _OSIS_REF.fullmatch(
-                reference.split("-")[0]
-            ):
-                add("osis", reference, display)
-            else:
-                add("passage", reference, display)
+            if reference:
+                located.append((match.start(), kind_of(reference), reference, display))
+        for _position, kind, reference, display in sorted(located, key=lambda item: item[0]):
+            add(kind, reference, display)
     return found
 
 
