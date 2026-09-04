@@ -61,8 +61,11 @@ with the published hash; never carry chapter or verse counts, or per-language bo
 names, in this repository. `conf/book_registry.json` holds only the book numbering and
 OSIS identifiers. Book names are resolved through the librarian (`getbible` on PyPI, the
 parser behind `query.getbible.net`); `conf/book_aliases/{language}.json` supplements its
-tables in their own format and is the only place a spelling is added. Text is never
-rewritten to make a citation easier to recognise.
+tables in their own format and is the only place a spelling is added, with
+`conf/book_aliases/modules/{module}.json` for a convention one module alone follows.
+Where a spelling is ambiguous, the Bible's shape decides — a book must have the chapter
+cited — never a per-module rule in code. Text is never rewritten to make a citation
+easier to recognise.
 
 Text is SWORD's `stripped` projection, except for ThML modules, whose source is projected
 by `src/study_builder/content.py` because SWORD's ThML plain filter discards every line

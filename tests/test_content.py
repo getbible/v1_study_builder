@@ -79,15 +79,21 @@ def test_markup_references_carry_their_target_and_display_text() -> None:
         '<ref osisRef="Bible:Ps.23.1">Ps 23:1</ref> <ref target="Bible:Ps.23.2">v. 2</ref> '
         '<ref target="Easton:ZIN">Zin</ref> '
         '<scripRef parsed="|Gen.11.7|" passage="Ge 11:7">Ge 11:7</scripRef> '
-        '<scripRef passage="Nu 21:6-9"><b>Nu</b> 21:6-9</scripRef> <scripRef>Mt 5:3</scripRef>'
+        '<scripRef passage="Nu 21:6-9"><b>Nu</b> 21:6-9</scripRef> <scripRef>Mt 5:3</scripRef> '
+        '<scripRef parsed="|Gen.11.9|">Ge 11:9</scripRef> '
+        '<scripRef parsed="|Gen|4|2|4|2;|Gen|4|8|4|8">Ge 4:2, 8</scripRef>'
     )
     assert extract_markup_references(raw) == [
         MarkupReference("osis", "Gen.4.2", "Gen. 4:2"),
         MarkupReference("osis", "Bible:Ps.23.1", "Ps 23:1"),
         MarkupReference("osis", "Ps.23.2", "v. 2"),
-        MarkupReference("osis", "Gen.11.7", "Ge 11:7"),
+        # One reference per tag: the passage, as SWORD renders it, over the parsed
+        # form; the parsed form only where it is all there is and really is OSIS.
+        MarkupReference("passage", "Ge 11:7", "Ge 11:7"),
         MarkupReference("passage", "Nu 21:6-9", "Nu 21:6-9"),
         MarkupReference("passage", "Mt 5:3", "Mt 5:3"),
+        MarkupReference("osis", "Gen.11.9", "Ge 11:9"),
+        MarkupReference("passage", "Ge 4:2, 8", "Ge 4:2, 8"),
     ]
 
 
@@ -105,9 +111,24 @@ def test_rendered_anchors_spell_every_family_the_same_way() -> None:
         MarkupReference("osis", "John.3.16-John.3.17", "John 3:16, 17"),
         MarkupReference("osis", "Rom.5.8", "Rom. 5:8"),
     ]
-    # The same reference in both forms is listed once.
+    # The rendered form describes the same tags as the source markup, so it is read
+    # only when the source carries no reference at all.
     raw = '<reference osisRef="Rom.5.8">Rom. 5:8</reference>'
-    assert len(extract_markup_references(raw, html)) == 3
+    assert extract_markup_references(raw, html) == [MarkupReference("osis", "Rom.5.8", "Rom. 5:8")]
+    assert len(extract_markup_references("<p>Rom. 5:8</p>", html)) == 3
+
+
+def test_markup_references_count_the_display_text_before_them() -> None:
+    raw = (
+        'Compare Gen 1:1 and <scripRef passage="Ex 1:1">1:1</scripRef>, then '
+        '<scripRef passage="Le 1:1">1:1</scripRef> with <b>1:1</b> and '
+        '<scripRef passage="Nu 1:1">1:1</scripRef>'
+    )
+    assert [(item.value, item.occurrence) for item in extract_markup_references(raw)] == [
+        ("Ex 1:1", 1),
+        ("Le 1:1", 2),
+        ("Nu 1:1", 4),
+    ]
 
 
 def test_empty_reference_tags_comments_and_order_are_read_as_the_document_has_them() -> None:

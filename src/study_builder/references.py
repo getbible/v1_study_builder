@@ -81,10 +81,26 @@ _ORDINAL = (
 )
 _ORDINAL_PREFIX = re.compile(rf"^({_ORDINAL})[{_SP_CHARS}.]*(.+)$", re.IGNORECASE)
 
-# A number that ends here: the next character is not another digit.
-_HEAD = re.compile(rf"(?P<chapter>{_NUM})(?:(?:{_SP}*:{_SP}*|\.)(?P<verse>{_NUM}))?(?!\d)")
+# A number that ends here: the next character is not another digit, and not the
+# comma of a thousands separator — "2,322 men" is a count, not a chapter and a verse
+# list. A list may still run "Ps 119:97,100-102": only a three-digit group beyond
+# 176, the last verse of that psalm, or one with a leading zero, is a separator.
+_THOUSANDS_GROUP = r"(?:0\d\d|[2-9]\d\d|1[89]\d|17[7-9])"
+_THOUSANDS = rf"(?!,{_THOUSANDS_GROUP})"
+# "Ps 88 (89):40" cites the psalm under two numberings, the Septuagint's first and
+# the Hebrew — which is the API's — in brackets; the bracketed chapter is the one
+# published.
+_HEAD = re.compile(
+    rf"(?P<chapter>{_NUM})(?:{_SP}*\((?P<chapter_alt>{_NUM})\)(?={_SP}*:))?"
+    rf"(?:(?:{_SP}*:{_SP}*|\.)(?P<verse>{_NUM}))?(?!\d){_THOUSANDS}"
+)
+# Webster writes chapters in roman numerals: "Rom. i. 28." A roman chapter is read
+# only directly after a book name, and only with a verse; "i. e." is not Genesis 1.
+_ROMAN_HEAD = re.compile(rf"(?P<roman>[ivxlc]{{1,7}})\.{_SP}*(?P<verse>{_NUM})(?!\d)")
+_ROMAN = re.compile(r"^(?:c{0,1})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})$")
+_ROMAN_VALUES = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100}
 _RANGE = (
-    rf"(?:{_SP}*{_DASH}{_SP}*(?:(?P<end_chapter>{_NUM})[:.])?(?P<end_verse>{_NUM})(?!\d)"
+    rf"(?:{_SP}*{_DASH}{_SP}*(?:(?P<end_chapter>{_NUM})[:.])?(?P<end_verse>{_NUM})(?!\d){_THOUSANDS}"
     rf"|{_SP}+to{_SP}+(?P<to_chapter>{_NUM}):(?P<to_verse>{_NUM})(?!\d))?"
 )
 # "8:1 ff" and "12:5 f." cite the verse and those that follow it; the suffix is kept
@@ -92,11 +108,16 @@ _RANGE = (
 _SUFFIX = rf"(?:{_SP}?ff?(?![{_LETTER}])\.?)?"
 _VERSE_TAIL = re.compile(_RANGE + _SUFFIX)
 _VERSE_MORE = re.compile(
-    rf"{_SP}*,{_SP}*(?:(?P<chapter>{_NUM})[:.])?(?P<verse>{_NUM})(?!\d)" + _RANGE + _SUFFIX
+    rf"{_SP}*,{_SP}*(?:(?P<chapter>{_NUM})[:.])?(?P<verse>{_NUM})(?!\d){_THOUSANDS}"
+    + _RANGE
+    + _SUFFIX
 )
+_LOWER = "a-z\u00df-\u00f6\u00f8-\u00ff"
 # A bare chapter is only continued when what follows cannot be prose: "Ex 28; 29;
-# Le 8" continues, "Ps 99:6; 4 sons of" does not.
-_DELIMITED = rf"(?={_SP}*(?:[^{_LETTER}\d{_SP_CHARS}]|$))"
+# Le 8" continues, "Ps 99:6; 4 sons of" does not, and nor does "Ex 28; 29, and".
+_DELIMITED = (
+    rf"(?={_SP}*(?:,(?!{_THOUSANDS_GROUP})(?!{_SP}*[{_LOWER}])|[^{_LETTER}\d{_SP_CHARS},]|$))"
+)
 _CHAPTER_TAIL = re.compile(rf"(?:{_SP}*{_DASH}{_SP}*(?P<end_chapter>{_NUM})(?!\d)(?![:.]\d))?")
 _CHAPTER_MORE = re.compile(
     rf"{_SP}*,{_SP}*(?P<chapter>{_NUM})(?:[:.](?P<verse>{_NUM})(?!\d)|(?!\d)(?![:.]\d){_DELIMITED})"
@@ -104,14 +125,21 @@ _CHAPTER_MORE = re.compile(
 _NEXT = re.compile(
     rf"{_SP}*;{_SP}*(?P<chapter>{_NUM})(?:[:.](?P<verse>{_NUM})(?!\d)|(?!\d)(?![:.]\d){_DELIMITED})"
 )
-# A chapter and verse standing alone in prose. A time of day is not a citation, but
-# "38:31 Am 5:8" cites Amos: a marker followed by a chapter is a book, not a meridiem.
+# A bare chapter in a table row — "the Exodus 1 | | 430" — is a tally, not a chapter.
+_TABLE_CELL = re.compile(rf"{_SP}*\|")
+# A chapter and verse standing alone in prose. A time of day is not a citation, nor
+# is the fraction of "7:1/4 acres", but "38:31 Am 5:8" cites Amos: a marker followed
+# by a chapter is a book, not a meridiem.
 _PROSE = re.compile(
-    rf"(?<![{_LETTER}\d:.,/-])(?P<chapter>{_NUM}):(?P<verse>{_NUM})(?!\d)"
-    rf"(?!{_SP}*(?:(?i:[ap]\.?m\.?)(?![{_LETTER}])(?!{_SP}*[(\[]?{_SP}*\d)|(?i:o['’]clock)))"
+    rf"(?<![{_LETTER}\d:.,/-])(?P<chapter>{_NUM}):(?P<verse>{_NUM})(?!\d)(?!/\d)"
+    rf"(?!{_SP}*(?:(?i:[ap]\.?{_SP}*m\.?)(?![{_LETTER}])(?!{_SP}*[(\[]?{_SP}*\d)"
+    rf"|(?i:o['’]clock)))"
 )
+# "ver. 7" cites a verse of the chapter last named; "ver. 1:22" names its own chapter
+# and is read as prose, and the "V." of "A.V. 2:14" is not the word verse.
 _VERSE_ONLY = re.compile(
-    rf"(?<![{_LETTER}])(?:(?:vv|ver|verses|verse)\.?{_SP}?|v\.{_SP})(?P<verse>{_NUM})(?!\d)"
+    rf"(?<![{_LETTER}.])(?:(?:vv|ver|verses|verse)\.?{_SP}?|v\.{_SP})(?P<verse>{_NUM})"
+    rf"(?!\d)(?![:.]\d)"
     rf"(?:{_SP}*{_DASH}{_SP}*(?P<end_verse>{_NUM})(?!\d))?"
     rf"(?P<more>(?:{_SP}*,{_SP}*{_NUM}(?!\d)(?:{_SP}*{_DASH}{_SP}*{_NUM}(?!\d))?)*)",
     re.IGNORECASE,
@@ -124,6 +152,10 @@ _PROSE_CONTINUES = re.compile(rf"{_SP}*,{_SP}*[a-z\u00df-\u00f6\u00f8-\u00ff]")
 _MONTHS = frozenset({"mar"})
 _LETTER_AT = re.compile(rf"[{_LETTER}]")
 _PRECEDING_WORD = re.compile(rf"([{_LETTER}][{_LETTER}'’.\-]*)\.?$")
+# Abbreviated titles of other works: what follows "Ep. Jer", "Test. Levi" or "Apoc.
+# Bar" is not the biblical book of that name. Only the abbreviation, with its full
+# stop, is a title; "a test Joh 11:3" cites John.
+_TITLE_PREFIXES = frozenset({"ep", "epist", "test", "apoc", "asc"})
 _CLOSERS = "'’\"”»)]"
 _SENTENCE_END = ".;:!?\n—–("
 _OSIS_ID = re.compile(
@@ -185,6 +217,34 @@ _MARKERS = frozenset(
         "se",
         "xem",
         "sánh",
+        # Sigla of the text a citation is taken from: "(LXX 4:8)", "A.V. 2:14".
+        "lxx",
+        "a.v",
+        "av",
+        "r.v",
+        "rv",
+        "asv",
+        "rsv",
+        "erv",
+        "kjv",
+        "rec",
+        "wh",
+        "tr",
+        "th",
+        "aq",
+        "sm",
+        "al",
+        "syr",
+        "vulg",
+        "vg",
+        "targ",
+        "heb",
+        "gr",
+        "sept",
+        "mss",
+        "ms",
+        "cod",
+        "codd",
     }
 )
 # Ordinary words: a citation may follow them, but only where they open a sentence.
@@ -294,6 +354,21 @@ _NOT_A_CITATION = frozenset(
         "hours",
         "hour",
         "minutes",
+        "sura",
+        "surah",
+        "col",
+        "cols",
+        "column",
+        "line",
+        "lines",
+        "sect",
+        "sec",
+        "act",
+        "scene",
+        "canto",
+        "bk",
+        "lib",
+        "tom",
     }
 )
 
@@ -308,6 +383,8 @@ class MarkupReference:
     kind: str  # "osis" for an osisRef value, "passage" for a human citation
     value: str
     display: str = ""
+    # How often the display text occurs in the text before this citation.
+    occurrence: int = 0
 
 
 @dataclass(frozen=True)
@@ -395,25 +472,33 @@ def _compress(numbers: list[int]) -> str:
 class BookAliases:
     """How a language spells the books, for recognising names in prose and resolving them.
 
-    The spellings come, in order of precedence, from ``conf/book_aliases/{language}.json``,
-    from the librarian's alias tables for the translations the module is checked
-    against, and from the names those translations publish in ``books.json``. Every
-    table is loaded into the librarian's own trie, so a name resolves exactly as it
-    would in a Query API request.
+    The spellings come, in order of precedence, from
+    ``conf/book_aliases/modules/{module}.json`` for the conventions one module alone
+    follows — Abbott-Smith names the books as the Septuagint does, so its "I Ki" is
+    1 Samuel — from ``conf/book_aliases/{language}.json``, from the librarian's alias
+    tables for the translations the module is checked against, and from the names
+    those translations publish in ``books.json``. Every table is loaded into the
+    librarian's own trie, so a name resolves exactly as it would in a Query API
+    request.
     """
 
-    def __init__(self, canon: Canon, aliases_dir: Path | None = None) -> None:
+    def __init__(
+        self, canon: Canon, aliases_dir: Path | None = None, module_id: str | None = None
+    ) -> None:
         self.canon = canon
         self._tries: list[GetBibleReferenceTrie] = []
         self._supplement: dict[int, list[str]] = {}
         self._librarian: dict[int, list[str]] = {}
         self.librarian_translations: list[str] = []
-        self.supplement: Path | None = None
+        self.supplements: list[Path] = []
         if aliases_dir is not None:
-            supplement = aliases_dir / f"{canon.language}.json"
-            if supplement.is_file():
-                self.supplement = supplement
-                self._load(supplement, self._supplement)
+            candidates = [aliases_dir / f"{canon.language}.json"]
+            if module_id:
+                candidates.insert(0, aliases_dir / "modules" / f"{module_id}.json")
+            for supplement in candidates:
+                if supplement.is_file():
+                    self.supplements.append(supplement)
+                    self._load(supplement, self._supplement)
         translations = [canon.names_translation, *canon.translations]
         for translation in dict.fromkeys(t for t in translations if t):
             resource = files("getbible").joinpath("data", f"{translation}.json")
@@ -475,7 +560,7 @@ class BookAliases:
             rf"(?<![{_UPPER}])(?:(?P<ordinal>{_ORDINAL}){_SP}*\.?{_SP}*\n?{_SP}*)?"
             rf"(?P<name>{_names_pattern(bare.values())})"
             rf"(?:\.{_SP}*|,{_SP}+(?=\d{{1,3}}{_SP}*:)|{_SP}+|(?={_SP}*\n)|(?=\d{{1,3}}:\d))"
-            rf"(?=\n?{_SP}*[(\[]?{_SP}*\d)"
+            rf"(?=\n?{_SP}*[(\[]?{_SP}*(?:\d|[ivxlc]{{1,7}}\.{_SP}*\d))"
         )
 
     def at(self, text: str, position: int) -> int | None:
@@ -492,10 +577,12 @@ class BookAliases:
         """Find the next book name at or after ``position``: its start, match, and number.
 
         A number before the name is read as its ordinal when the two together name a
-        book, even where a Vietnamese Strong's number runs straight into it —
-        "G16402 Cô 8:15" is 2 Corinthians, not Colossians. A digit wedged between a
-        number and the name with no separator on either side — the "4" of "H894Ma
-        1:11" — is the number's last digit, not an ordinal, so the name stands alone.
+        book that has the chapter cited, even where a Vietnamese Strong's number runs
+        straight into it — "G16402 Cô 8:15" is 2 Corinthians, not Colossians. Where
+        they do not, the name stands alone: the "3" of "Heb 1:1-3 Joh 17:2" ends a
+        range, since 3 John has no chapter 17; and a digit wedged between a number
+        and the name with at most a full stop between them — the "4" of "H894Ma
+        1:11" or "H1162.Ma 1:5" — is the number's last digit.
         """
         if self.pattern is None:
             return None
@@ -514,21 +601,32 @@ class BookAliases:
         ordinal = match.group("ordinal")
         name = match.group("name")
         start = match.start()
-        book = None
+        readings: list[tuple[int, int]] = []
         if ordinal:
             wedged = (
                 start > 0
                 and text[start - 1].isdigit()
-                and match.end("ordinal") == match.start("name")
+                and text[match.end("ordinal") : match.start("name")] in ("", ".")
             )
             if not wedged:
                 book = self.resolve(f"{_ordinal_value(ordinal)} {name}")
-        if book is None:
-            book = self.resolve(name)
-            start = match.start("name")
-        if book is None:
+                if book is not None:
+                    readings.append((start, book))
+        book = self.resolve(name)
+        if book is not None:
+            readings.append((match.start("name"), book))
+        if not readings:
             return None
+        chapter = _CHAPTER_AFTER.match(text, match.end())
+        if chapter is not None:
+            for start, book in readings:
+                if self.canon.has_chapter(book, int(chapter.group("chapter"))):
+                    return start, match, book
+        start, book = readings[0]
         return start, match, book
+
+
+_CHAPTER_AFTER = re.compile(rf"\n?{_SP}*[(\[]?{_SP}*(?P<chapter>{_NUM})(?!\d)")
 
 
 def _normalize(name: str) -> str:
@@ -840,17 +938,29 @@ class _Scan:
             # "Ezra (2 Esdras 1:2)": the number is the ordinal of the next book, not
             # a chapter of this one, so this name is not a citation at all.
             return match.end()
-        head = _HEAD.match(self.text, position)
-        if head is None:  # unreachable: the name pattern looks ahead for a digit
+        if self._title_before(start):
+            # "Ep. Jer 5" cites the Epistle of Jeremy, not Jeremiah.
             return match.end()
-        if head.group("verse") is None and not self.strict:
-            name = match.group("name")
+        name = match.group("name")
+        head = _HEAD.match(self.text, position)
+        if head is None:
+            roman = _ROMAN_HEAD.match(self.text, position)
+            if roman is None or _roman_value(roman.group("roman")) is None:
+                return match.end()
+            chapter = _roman_value(roman.group("roman"))
+            assert chapter is not None
+            head_values = (chapter, int(roman.group("verse")), roman.end())
+        else:
+            head_values = _head_values(head)
+        if head_values[1] is None and not self.strict:
+            assert head is not None
             if (
                 wrapped
-                or not explicit
+                or (not explicit and not _NEXT.match(self.text, head.end()))
                 or _SENSE.match(self.text, head.end())
                 or _LETTER_AT.match(self.text, head.end())
                 or _PROSE_CONTINUES.match(self.text, head.end())
+                or _TABLE_CELL.match(self.text, head.end())
                 or (len(name) > 1 and name.isupper())
                 or name.casefold() in _MONTHS
             ):
@@ -858,21 +968,26 @@ class _Scan:
                 # 3rd" is not John 3, "PHILIP (1)" is a numbered headword, "See
                 # HEBREWS 2." a cross-reference to a topic, "Mar. 8, and" a date and
                 # "Ex 3, which" a chapter running on into prose. None cites a chapter.
+                if not explicit and not name.isupper():
+                    # "Daniel (8)" still names the book a later "9:26" belongs to.
+                    self.context = _Context(book, None)
                 return match.end()
-        end, spans = self._spans(head)
-        self.context = _Context(book, spans[-1].chapter if spans else None)
+        end, spans = self._spans(*head_values, book=book)
+        self.context = _Context(book, _last_chapter(spans))
         self._emit(start if explicit else position, end, spans)
         return self._continuations(end, emit=True)
 
     def _prose_citation(self, match: re.Match[str]) -> int:
-        if self.context.book is None or not self._plain_before(match.start()):
-            # Nothing to inherit, or the citation of another work: skip it and
-            # whatever continues it, so "Enoch 6:6; 8:1" does not leak its tail.
-            return self._continuations(match.end(), emit=False)
         head = _HEAD.match(self.text, match.start())
         assert head is not None
-        end, spans = self._spans(head)
-        self.context.chapter = spans[-1].chapter if spans else self.context.chapter
+        if self.context.book is None or not self._plain_before(match.start()):
+            # Nothing to inherit, or the citation of another work: skip it and
+            # whatever continues it, so neither "Enoch 6:6; 8:1" nor "Enoch 6:6, 8:1"
+            # leaks its tail.
+            end, _spans = self._spans(*_head_values(head), book=None)
+            return self._continuations(end, emit=False)
+        end, spans = self._spans(*_head_values(head), book=self.context.book)
+        self.context.chapter = _last_chapter(spans) or self.context.chapter
         self._emit(match.start(), end, spans)
         return self._continuations(end, emit=True)
 
@@ -901,9 +1016,9 @@ class _Scan:
                 return position
             head = _HEAD.match(self.text, match.start("chapter"))
             assert head is not None
-            end, spans = self._spans(head)
+            end, spans = self._spans(*_head_values(head), book=self.context.book if emit else None)
             if emit:
-                self.context.chapter = spans[-1].chapter if spans else self.context.chapter
+                self.context.chapter = _last_chapter(spans) or self.context.chapter
                 self._emit(match.start("chapter"), end, spans)
             position = end
 
@@ -936,6 +1051,16 @@ class _Scan:
             return self.strict or self._opens_sentence(match.start())
         return False
 
+    def _title_before(self, position: int) -> bool:
+        """Whether the word before a book name makes it the title of another work."""
+        index = position
+        while index > 0 and self.text[index - 1] in _SP_CHARS:
+            index -= 1
+        if index == 0 or self.text[index - 1] != ".":
+            return False
+        match = _PRECEDING_WORD.search(self.text, max(0, index - 16), index)
+        return match is not None and match.group(1).strip(".").casefold() in _TITLE_PREFIXES
+
     def _opens_sentence(self, position: int) -> bool:
         index = position
         while index > 0 and self.text[index - 1] in _SP_CHARS + _CLOSERS:
@@ -953,11 +1078,22 @@ class _Scan:
                 return self._book_at(match.start(group))
         return False
 
-    def _spans(self, head: re.Match[str]) -> tuple[int, list[Span]]:
-        """Read one citation chunk from its first number to where the numbers stop."""
-        chapter = int(head.group("chapter"))
-        verse = _end(head, "verse")
-        end = head.end()
+    def _spans(
+        self, chapter: int, verse: int | None, end: int, *, book: int | None
+    ) -> tuple[int, list[Span]]:
+        """Read one citation chunk from its first number, which ends at ``end``, to where
+        the numbers stop.
+
+        A bare number after a book of one chapter is a verse: "Jude 7" and "Ob 3" cite
+        verses, as every reader takes them to, and the API has no chapter 7 of Jude.
+        """
+        if (
+            verse is None
+            and chapter != 1
+            and book is not None
+            and self.aliases.canon.chapter_count(book) == 1
+        ):
+            chapter, verse = 1, chapter
         spans: list[Span] = []
         if verse is not None:
             tail = _VERSE_TAIL.match(self.text, end)
@@ -968,6 +1104,9 @@ class _Scan:
             else:
                 spans.append(_range_span(chapter, verse, tail))
                 end = tail.end()
+                # "1Ki 15:1-16:7,12": what follows a range across chapters continues
+                # the chapter it ends in.
+                chapter = spans[-1].end_chapter or chapter
         else:
             tail = _CHAPTER_TAIL.match(self.text, end)
             assert tail is not None
@@ -989,6 +1128,7 @@ class _Scan:
                     end = more.end("verse")
                     break
                 spans.append(_range_span(chapter, int(more.group("verse")), more))
+                chapter = spans[-1].end_chapter or chapter
             else:
                 more = _CHAPTER_MORE.match(self.text, end)
                 if (
@@ -1025,6 +1165,32 @@ def _end(match: re.Match[str] | None, group: str) -> int | None:
     return int(value) if value else None
 
 
+def _head_values(head: re.Match[str]) -> tuple[int, int | None, int]:
+    """The chapter, verse and end of a citation head; a bracketed alternative chapter
+    numbering — the Hebrew one after the Septuagint's — is the API's."""
+    chapter = _end(head, "chapter_alt") or int(head.group("chapter"))
+    return chapter, _end(head, "verse"), head.end()
+
+
+def _last_chapter(spans: list[Span]) -> int | None:
+    """The chapter a citation leaves the reader in, for what follows to inherit."""
+    if not spans:
+        return None
+    return spans[-1].end_chapter or spans[-1].chapter
+
+
+def _roman_value(numeral: str) -> int | None:
+    """The value of a lowercase roman numeral, or None where the letters are not one."""
+    if not _ROMAN.match(numeral):
+        return None
+    total = 0
+    for index, letter in enumerate(numeral):
+        value = _ROMAN_VALUES[letter]
+        following = _ROMAN_VALUES[numeral[index + 1]] if index + 1 < len(numeral) else 0
+        total += -value if value < following else value
+    return total or None
+
+
 def _range_span(chapter: int, verse: int, tail: re.Match[str]) -> Span:
     end_chapter = _end(tail, "end_chapter") or _end(tail, "to_chapter")
     end_verse = _end(tail, "end_verse") or _end(tail, "to_verse")
@@ -1044,10 +1210,11 @@ class ReferenceEngine:
         registry: BookRegistry,
         aliases_dir: Path | None = None,
         checker: GetBibleReference | None = None,
+        module_id: str | None = None,
     ) -> None:
         self.canon = canon
         self.registry = registry
-        self.aliases = BookAliases(canon, aliases_dir)
+        self.aliases = BookAliases(canon, aliases_dir, module_id)
         self.resolver = ReferenceResolver(canon, self.aliases, registry, checker)
         self.scanner = ProseScanner(self.aliases, self.resolver)
 
@@ -1060,15 +1227,20 @@ class ReferenceEngine:
         versification: str,
         aliases_dir: Path | None = None,
         checker: GetBibleReference | None = None,
+        module_id: str | None = None,
     ) -> ReferenceEngine:
-        return cls(bible.canon_for(language, versification), registry, aliases_dir, checker)
+        canon = bible.canon_for(language, versification)
+        return cls(canon, registry, aliases_dir, checker, module_id)
 
     def describe(self) -> dict[str, Any]:
         """What a module's metadata records about how its references were resolved."""
         return {
             **self.canon.describe(),
             "librarian": list(self.aliases.librarian_translations),
-            "aliases": self.aliases.supplement.name if self.aliases.supplement else None,
+            "aliases": [
+                f"modules/{path.name}" if path.parent.name == "modules" else path.name
+                for path in self.aliases.supplements
+            ],
         }
 
     def from_osis(self, value: str) -> list[dict]:
@@ -1113,7 +1285,7 @@ class ReferenceEngine:
                     reference.value, book=context.book, chapter=context.chapter
                 )
             display = " ".join(reference.display.split())
-            located = _locate(text, display, cursor) if display else None
+            located = _locate(text, display, cursor, reference.occurrence) if display else None
             if located is not None:
                 # Whatever the markup cites, the text it covers is not prose: a
                 # citation the API cannot resolve must not be re-read as one it can.
@@ -1143,15 +1315,26 @@ class ReferenceEngine:
         return _dedupe([item for _position, _order, item in found])
 
 
-def _locate(text: str, display: str, start: int) -> tuple[int, int] | None:
-    """Where the display text of a markup reference stands in the text, from ``start``.
+def _locate(text: str, display: str, start: int, occurrence: int = 0) -> tuple[int, int] | None:
+    """Where the display text of a markup reference stands in the text.
 
     The markup may break a citation across a line where the text does; the words are
-    matched with any white space between them.
+    matched with any white space between them. The markup says how many times the
+    display occurs before the citation, and that occurrence is taken when it lies at
+    or after ``start``, where the previous citation ended: the "1:1" of "Gen 1:1 and
+    1:1" is the second one. Failing that, the first occurrence from ``start``.
     """
-    pattern = r"\s+".join(re.escape(word) for word in display.split())
-    match = re.compile(pattern).search(text, start)
-    return (match.start(), match.end()) if match else None
+    pattern = re.compile(r"\s+".join(re.escape(word) for word in display.split()))
+    matches = [match for match in pattern.finditer(text) if match.end() > start]
+    if not matches:
+        return None
+    candidates = [match for match in matches if match.start() >= start]
+    if not candidates:
+        return None
+    before = len(matches) - len(candidates)
+    chosen = candidates[occurrence - before] if 0 <= occurrence - before < len(candidates) else None
+    match = chosen or candidates[0]
+    return match.start(), match.end()
 
 
 def _dedupe(items: Iterable[dict]) -> list[dict]:
