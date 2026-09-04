@@ -323,7 +323,7 @@ https://query.getbible.net/v2/kjv/Numbers 20:1
 
 Where the source module marks its references up — an OSIS `osisRef`, a TEI `ref`, a
 ThML `scripRef` passage, a `sword://Bible/` link — the markup decides what the text it
-covers cites. Many dictionaries (Thompson Chain, Torrey, Smith, the American Tract
+covers cites, one reference per tag. Many dictionaries (Thompson Chain, Torrey, Smith, the American Tract
 Society dictionary) and some commentaries carry citations only in the prose:
 
 ```text
@@ -354,7 +354,10 @@ Resolving a reference is the rule commentary entries already use: **it covers
 chapter when there is no `verse` at all.** `Ge 21:9-14` lists six verses, `Ex 28`
 names a chapter, and `Mt 5-7` is three chapter items. A range that crosses a chapter
 boundary, `Nu 16:1-17:13`, is published once per chapter it covers, with the API's verse
-counts deciding where chapter 16 ends.
+counts deciding where chapter 16 ends. A topical list may name forty verses of one
+psalm; the item stays one item, and its `ref` may then be longer than the hundred
+characters the public Query API accepts in one request, so a client passing `ref`
+on should split `verses` where it exceeds that.
 
 Recognising a book name is the librarian's job. Its per-translation tables and
 Unicode-normalising trie — the engine behind `query.getbible.net` — resolve `1Sa`,
@@ -362,15 +365,27 @@ Unicode-normalising trie — the engine behind `query.getbible.net` — resolve 
 a `ref` is by construction a reference the Query API resolves. `conf/book_aliases/`
 adds, in the librarian's own table format, the spellings the current modules use that
 its tables lack (Online Bible's `Lu`, `Joe`, `Jud`; Smith's `Isai`, `Psal`), ready to be
-contributed upstream; adding a spelling or a language is a data change. A module in a
-language with no table is read with the names its translation publishes and the
-spellings of the translation that gives it its shape.
+contributed upstream; adding a spelling or a language is a data change. A convention one
+module alone follows lives in `conf/book_aliases/modules/{module}.json`, which takes
+precedence for that module: Abbott-Smith names the books as the Septuagint does, so its
+`I Ki` is 1 Samuel and its `Ez` Ezekiel, while for every other English module `Ez` is
+Ezra. A module in a language with no table is read with the names its translation
+publishes and the spellings of the translation that gives it its shape.
 
-Citations of other works — `Ant. 11:8`, `Enoch 6:6`, `Sib Or 3:271` — are left alone, as
-are times of day, ratios, page numbers, numbered headwords (`PHILIP (1)`) and topic
-cross-references (`See HEBREWS 2.`). A chapter the book does not have, or a verse the
-chapter does not have, is not published: the API has nothing at that address, so `1 Ki
-30:1` and `Genesis 50:36` resolve to nothing.
+The Bible's shape settles what a spelling means where the spelling alone cannot. A
+number before a name is its ordinal only when the book so named has the chapter cited:
+in `Heb 1:1-3 Joh 17:2` the 3 ends the range, since 3 John has no chapter 17. A bare
+number after a book of one chapter is a verse, so `Jude 7` is Jude 1:7. A chapter
+written under two numberings, `Ps 88 (89):40`, is published under the bracketed one,
+which is the Hebrew numbering the API uses. Webster's roman chapters, `Rom. i. 28`, are
+read directly after a book name.
+
+Citations of other works — `Ant. 11:8`, `Enoch 6:6`, `Sib Or 3:271`, `Ep. Jer 5` — are
+left alone, as are times of day, ratios, fractions, counts (`2,322 men`), page numbers,
+numbered headwords (`PHILIP (1)`) and topic cross-references (`See HEBREWS 2.`). A
+chapter the book does not have, or a verse the chapter does not have, is not published:
+the API has nothing at that address, so `1 Ki 30:1` and `Genesis 50:36` resolve to
+nothing.
 
 ## Integrity and schemas
 

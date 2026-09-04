@@ -320,12 +320,14 @@ class DictionaryWriter:
             ]
         # What the markup cites is authoritative for the text it covers; the rest of
         # the text is read as prose, so a client can link the word to the Bible
-        # without parsing the text itself.
+        # without parsing the text itself. An entry headed by the name of a book —
+        # Easton's "Amos" — cites its own book without naming it: "(7:14, 15)".
         references = self.references.extract(
             content["text"],
             markup=extract_markup_references(
                 str(source.get("raw", "")), str(source.get("html", ""))
             ),
+            book=self.references.aliases.resolve(item.key),
         )
         if references:
             document["references"] = references

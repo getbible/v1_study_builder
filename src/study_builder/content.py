@@ -236,24 +236,26 @@ def _bible_target(value: str) -> str | None:
     return value or None
 
 
+def _is_osis(reference: str) -> bool:
+    """Whether every token of a parsed reference is an OSIS identifier; CCEL's ThML also
+    writes "|Gen|4|2|4|2", which is not."""
+    tokens = reference.split()
+    return bool(tokens) and all(_OSIS_REF.fullmatch(token.split("-")[0]) for token in tokens)
+
+
 def extract_markup_references(*values: str) -> list[MarkupReference]:
     """Every scripture reference the markup carries, in document order, with its display text.
 
-    Both the source markup and the rendered form are read: they spell the same reference
-    differently, and a module may carry a passage only its markup attributes state.
+    The source markup is read first and the rendered form only when the source carries
+    no reference at all: both describe the same tags, so reading both would publish
+    each citation twice. A ``scripRef`` is read from its ``passage`` — the citation as
+    SWORD renders it — and from ``parsed`` only where there is no passage and the value
+    really is OSIS. Each reference records how often its display text occurs in the
+    text before it, so that a display without a book name, "1:1", is located at its own
+    citation and not inside an earlier one.
     """
     found: list[MarkupReference] = []
     seen: set[tuple[str, str, str]] = set()
-
-    def add(kind: str, value: str, display: str) -> None:
-        value = " ".join(value.split())
-        if not value:
-            return
-        key = (kind, value.casefold(), display.casefold())
-        if key in seen:
-            return
-        seen.add(key)
-        found.append(MarkupReference(kind, value, display))
 
     def kind_of(reference: str) -> str:
         head = reference.split()[0].split("-")[0]
@@ -263,45 +265,60 @@ def extract_markup_references(*values: str) -> list[MarkupReference]:
         # Comments carry no live markup, and every kind of tag is read in the order the
         # document has them, so their display texts are located in the text in turn.
         value = _COMMENT.sub(" ", value)
-        located: list[tuple[int, str, str, str]] = []
+        located: list[tuple[int, int, str, str, str]] = []
         for match in _REFERENCE_TAG.finditer(value):
             attrs = _attributes(match.group("attrs"))
             display = _display(match.group("inner"))
             tag = match.group("tag").casefold()
+            span = (match.start(), match.end())
             if tag == "scripref":
                 parsed = attrs.get("parsed", "").replace("|", " ").strip()
-                if parsed:
-                    located.append((match.start(), "osis", parsed, display))
-                elif attrs.get("passage", "").strip():
-                    located.append((match.start(), "passage", attrs["passage"], display))
+                if attrs.get("passage", "").strip():
+                    located.append((*span, "passage", attrs["passage"], display))
+                elif parsed and _is_osis(parsed):
+                    located.append((*span, "osis", parsed, display))
                 elif display:
-                    located.append((match.start(), "passage", display, display))
+                    located.append((*span, "passage", display, display))
                 continue
             osis = attrs.get("osisref", "").strip()
             if osis:
-                located.append((match.start(), "osis", osis, display))
+                located.append((*span, "osis", osis, display))
                 continue
             target = _bible_target(attrs.get("target", ""))
             if target:
-                located.append((match.start(), kind_of(target), target, display))
+                located.append((*span, kind_of(target), target, display))
         for match in _ANCHOR.finditer(value):
             attrs = _attributes(match.group("attrs"))
             href = attrs.get("href", "")
             display = _display(match.group("inner"))
             lowered = href.casefold()
+            span = (match.start(), match.end())
             if lowered.startswith("sword://"):
                 target = _bible_target(href)
                 if target:
-                    located.append((match.start(), kind_of(target), target, display))
+                    located.append((*span, kind_of(target), target, display))
                 continue
             if "action=showref" not in lowered:
                 continue
             query = parse_qs(urlsplit(href.replace("&amp;", "&")).query)
             reference = " ".join(query.get("value", [""])).strip()
             if reference:
-                located.append((match.start(), kind_of(reference), reference, display))
-        for _position, kind, reference, display in sorted(located, key=lambda item: item[0]):
-            add(kind, reference, display)
+                located.append((*span, kind_of(reference), reference, display))
+        before = ""
+        cursor = 0
+        for start, end, kind, reference, display in sorted(located, key=lambda item: item[0]):
+            before += " ".join(strip_markup(value[cursor:start]).split()) + " "
+            cursor = end
+            occurrence = before.count(display) if display else 0
+            before += display + " "
+            reference = " ".join(reference.split())
+            key = (kind, reference.casefold(), display.casefold())
+            if not reference or key in seen:
+                continue
+            seen.add(key)
+            found.append(MarkupReference(kind, reference, display, occurrence))
+        if found:
+            break
     return found
 
 
