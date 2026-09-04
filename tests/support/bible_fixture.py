@@ -1121,6 +1121,7 @@ TRANSLATIONS: dict[str, dict[str, Any]] = {
         "books": books({1: "1. Mose", 43: "Johannes"}),
     },
     "klv": {"lang": "tlh", "versification": "", "books": books({1: "Genesis"})},
+    "douayrheims": {"lang": "en", "versification": "Vulg", "books": books({1: "Genesis"})},
 }
 
 
