@@ -407,6 +407,24 @@ def test_markup_the_text_does_not_spell_out_is_published_without_text(english) -
     ]
 
 
+def test_a_prose_list_stops_where_the_markup_takes_over(english) -> None:
+    # The source marks only the second citation up, and says it is Deuteronomy; the
+    # prose list before it must not read "9:20" as Exodus as well.
+    items = english.extract(
+        "See Exodus 4:14; 9:20 and Ge 1:1, 2 there.",
+        markup=[
+            MarkupReference("passage", "Deuteronomy 9:20", "9:20"),
+            MarkupReference("osis", "Gen.1.2", "2"),
+        ],
+    )
+    assert [(item.get("text"), item["ref"]) for item in items] == [
+        ("Exodus 4:14", "Exodus 4:14"),
+        ("9:20", "Deuteronomy 9:20"),
+        ("Ge 1:1", "Genesis 1:1"),
+        ("2", "Genesis 1:2"),
+    ]
+
+
 def test_unresolvable_markup_still_shields_its_text_from_prose_reading(english) -> None:
     # The passage names a book the API has no translation for, so nothing is published
     # for it, but "9:20" must not then be read as the previous book's chapter.

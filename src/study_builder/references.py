@@ -888,11 +888,16 @@ class _Scan:
         self._emit(match.start(), match.end(), spans)
         return match.end()
 
+    def _guarded(self, position: int) -> bool:
+        """Whether ``position`` lies inside a stretch a markup reference covers."""
+        return any(guard.start <= position < guard.end for guard in self.guards)
+
     def _continuations(self, position: int, *, emit: bool) -> int:
         """Consume "; 12:24" and "; 29" chunks that continue the current book."""
         while True:
             match = _NEXT.match(self.text, position)
-            if match is None:
+            if match is None or self._guarded(match.start("chapter")):
+                # What the markup covers is the markup's to say, not the list's.
                 return position
             head = _HEAD.match(self.text, match.start("chapter"))
             assert head is not None
@@ -971,10 +976,12 @@ class _Scan:
         while True:
             if verse is not None:
                 more = _VERSE_MORE.match(self.text, end)
-                if more is None or self._book_at(
-                    more.start("chapter") if more.group("chapter") else more.start("verse")
-                ):
-                    # "Ps 1:1, 2 Sam 3:4": the number opens the next book, not this list.
+                if more is None:
+                    break
+                next_start = more.start("chapter") if more.group("chapter") else more.start("verse")
+                if self._book_at(next_start) or self._guarded(next_start):
+                    # "Ps 1:1, 2 Sam 3:4": the number opens the next book, not this list;
+                    # and a number the markup covers is the markup's to read.
                     break
                 chapter = _end(more, "chapter") or chapter
                 if self._range_opens_book(more):
@@ -984,7 +991,11 @@ class _Scan:
                 spans.append(_range_span(chapter, int(more.group("verse")), more))
             else:
                 more = _CHAPTER_MORE.match(self.text, end)
-                if more is None or self._book_at(more.start("chapter")):
+                if (
+                    more is None
+                    or self._book_at(more.start("chapter"))
+                    or self._guarded(more.start("chapter"))
+                ):
                     break
                 chapter = int(more.group("chapter"))
                 verse = _end(more, "verse")
