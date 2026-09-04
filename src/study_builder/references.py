@@ -474,7 +474,7 @@ class BookAliases:
         return re.compile(
             rf"(?<![{_UPPER}])(?:(?P<ordinal>{_ORDINAL}){_SP}*\.?{_SP}*\n?{_SP}*)?"
             rf"(?P<name>{_names_pattern(bare.values())})"
-            rf"(?:\.{_SP}*|,{_SP}+|{_SP}+|(?={_SP}*\n)|(?=\d{{1,3}}:\d))"
+            rf"(?:\.{_SP}*|,{_SP}+(?=\d{{1,3}}{_SP}*:)|{_SP}+|(?={_SP}*\n)|(?=\d{{1,3}}:\d))"
             rf"(?=\n?{_SP}*[(\[]?{_SP}*\d)"
         )
 

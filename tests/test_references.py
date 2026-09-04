@@ -248,11 +248,13 @@ def test_whole_chapters_and_chapter_lists(english) -> None:
     assert [item["ref"] for item in items[8:]] == ["Matthew 5", "Matthew 6", "Matthew 7"]
 
 
-def test_a_comma_may_separate_the_name_from_the_chapter(english) -> None:
+def test_a_comma_may_separate_the_name_from_a_chapter_and_verse(english) -> None:
     items = english.extract("Again, in Philippians, 3:13, 14, we are told")
     assert [(item["text"], item["ref"]) for item in items] == [
         ("Philippians, 3:13, 14", "Philippians 3:13-14")
     ]
+    # A general dictionary's "See Ho, 2." points at sense 2 of the word Ho.
+    assert english.extract("Whoa, interj. Stop; stand; hold. See Ho, 2. From Mat, 4.") == []
 
 
 def test_a_month_or_a_chapter_running_into_prose_is_not_a_citation(english) -> None:
