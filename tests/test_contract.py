@@ -222,3 +222,43 @@ def test_module_text_is_decoded_without_losing_characters() -> None:
     )
     assert decode_module_text(b"plain") == "plain"
     assert decode_module_text(b"\x81\x8d") == "\x81\x8d"
+
+
+def test_a_declared_single_byte_encoding_decodes_the_whole_stream(
+    reader: GetBibleSwordContractReader,
+) -> None:
+    records = base_records()
+    records.insert(
+        2,
+        {
+            "name": byte_value("Encoding"),
+            "ordinal": 0,
+            "type": "config_entry",
+            "value": byte_value("Latin-1"),
+        },
+    )
+    records[3] = {
+        **records[3],
+        "key": byte_value(b"Caf\xe9"),
+        "raw": byte_value(b"<p>Moses\x92 caf\xe9</p>"),
+        "rendered_default": byte_value(b"<p>Moses\x92 caf\xe9</p>"),
+        "stripped": byte_value(b"Moses\x92 caf\xe9"),
+    }
+    exported = reader.read(io.BytesIO(stream(records)))
+    entry = exported.entries[0]
+    assert entry["key"] == "Café"
+    assert entry["plain"] == "Moses’ café"
+    assert entry["raw"] == "<p>Moses’ café</p>"
+
+
+def test_stray_windows_1252_bytes_in_a_utf8_module_are_kept(
+    reader: GetBibleSwordContractReader,
+) -> None:
+    records = base_records()
+    records[2] = {
+        **records[2],
+        "raw": byte_value(b"(1\xa0Chronicles 6:23) David\x92s caf\xc3\xa9"),
+        "stripped": byte_value(b"(1\xa0Chronicles 6:23) David\x92s caf\xc3\xa9"),
+    }
+    exported = reader.read(io.BytesIO(stream(records)))
+    assert exported.entries[0]["plain"] == "(1 Chronicles 6:23) David’s café"
