@@ -251,7 +251,8 @@ navigate in either direction without rebuilding an index:
 `see_also` lists the words this entry points at and `backlinks` the words that
 point back. Only targets that resolve to a real key in the same dictionary are
 published. Scripture references stay in `references`, in the same shape the
-commentary API uses.
+commentary API uses; see [Scripture references](#scripture-references) for how
+citations written in the text itself are published.
 
 Some SWORD dictionaries legitimately contain more than one definition for the
 same public key. The first definition keeps the canonical direct path, and later
@@ -263,6 +264,60 @@ value. Dictionary metadata reports both the total `entry_count` and the distinct
 
 `{dictionary}.json` is the complete dictionary in index order, for offline
 clients that would otherwise request every word individually.
+
+## Scripture references
+
+Every entry that cites scripture carries `references`, in the same shape in both
+APIs. `book`, `chapter`, and `verse` are Bible API v3 coordinates, so a client can
+move from a word or a comment to the verse with a direct lookup, and build the
+reverse index from a verse to every entry that cites it:
+
+```json
+{"osis": "Num.20.1", "book": 4, "chapter": 20, "verse": 1}
+```
+
+Where the source module marks its references up, they are published from that
+markup. Many dictionaries — Thompson Chain, Torrey, Nave, Smith, the American
+Tract Society dictionary — and some commentaries carry them only in the prose:
+
+```text
+son of Adam, slain by Cain Ge 4:2,8; Mt 23:35; Heb 11:4; 12:24
+```
+
+The text is published exactly as the source wrote it. The citations are recognised
+in it and published beside it, in the order the text cites them:
+
+```json
+"references": [
+  {"text": "Ge 4:2,8", "ref": "Ge 4:2,8", "osis": "Gen.4.2", "book": 1, "chapter": 4, "verse": 2, "verses": [2, 8]},
+  {"text": "Mt 23:35", "ref": "Mt 23:35", "osis": "Matt.23.35", "book": 40, "chapter": 23, "verse": 35},
+  {"text": "Heb 11:4", "ref": "Heb 11:4", "osis": "Heb.11.4", "book": 58, "chapter": 11, "verse": 4},
+  {"text": "12:24", "ref": "Heb 12:24", "osis": "Heb.12.24", "book": 58, "chapter": 12, "verse": 24}
+]
+```
+
+`text` is the citation exactly as it appears in the entry's `text`, so a client can
+find it there and link it. `ref` is the same citation with the book name restored:
+a citation that names no book — `12:24`, or `In 9:46 he is called` — belongs to the
+book named most recently in the text, and `ver. 7` to the chapter cited most
+recently. A comment in a commentary belongs to its own book and chapter until it
+names another. Both members are present only on references recognised in the
+text; references taken from source markup carry the coordinates alone.
+
+Resolving a reference is the rule commentary entries already use: **it covers
+`verses` when that member is present, `verse` alone when it is not, and the whole
+chapter when there is no `verse` at all.** `Ge 21:9-14` lists six verses, `Ex 28`
+names a chapter, and `Mt 5-7` is three chapter items. A range that crosses a chapter
+boundary, `Nu 16:1-17:13`, is published once per chapter it covers, with the KJV
+verse counts in `conf/book_registry.json` deciding where chapter 16 ends.
+
+Book names are recognised in the spellings `conf/book_registry.json` lists for the
+module's language: Online Bible abbreviations (`Ge`, `Joh`, `1 Sa`), dotted and full
+names (`Gen.`, `1 Chr.`, `Genesis`), roman ordinals (`II Co`), and the Swedish and
+Vietnamese sets the current modules use. A module in a language without a table
+publishes only its marked-up references. Citations of other works — `Ant. 11:8`,
+`Enoch 6:6` — are left alone, and a chapter the book does not have is not published,
+so a stray `1 Ki 30:1` cannot resolve to anything.
 
 ## Integrity and schemas
 

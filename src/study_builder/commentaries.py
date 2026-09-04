@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ from study_builder.books import BookRegistry
 from study_builder.chapter_spool import CommentaryChapterSpool
 from study_builder.content import extract_osis_references, public_content
 from study_builder.models import ModuleDescriptor, NativeExport
+from study_builder.references import ReferenceParser
 from study_builder.util import (
     DOCUMENT_CEILING_BYTES,
     enforce_document_ceiling,
@@ -44,10 +46,12 @@ class CommentaryWriter:
         self.books = books
         self.max_document_bytes = max_document_bytes
         self.chapter_schema = read_json(schemas_dir / "commentary-chapter.schema.json")
+        self.parser: ReferenceParser | None = None
 
     def write(self, module: ModuleDescriptor, exported: NativeExport) -> tuple[dict, dict]:
         module_id = slug(module.name)
         module_root = self.root / module_id
+        self.parser = ReferenceParser(self.books, module.language)
         chapter_files: dict[int, list[Path]] = defaultdict(list)
         chapter_counts: dict[int, list[tuple[int, int]]] = defaultdict(list)
         entry_count = 0
@@ -206,6 +210,13 @@ class CommentaryWriter:
             normalized = self.books.reference(reference)
             if normalized:
                 related.append(normalized)
+        if not related and self.parser is not None:
+            # No markup carried the references, so recognise them in the prose. A
+            # comment cites its own book when it names none, so that book and
+            # chapter seed what an unqualified "3:16" or "ver. 5" resolves to.
+            related = self.parser.extract(
+                content["text"], book=book.number, chapter=chapter if chapter > 0 else None
+            )
         if related:
             entry["references"] = related
         return entry
@@ -230,7 +241,7 @@ class CommentaryWriter:
         order: list[str] = []
         anchors: dict[str, dict[str, Any]] = {}
         covered: dict[str, set[int]] = {}
-        references: dict[str, dict[tuple[Any, ...], dict[str, Any]]] = {}
+        references: dict[str, dict[str, dict[str, Any]]] = {}
         for entry in chapters.entries(book_number, chapter_number):
             text = str(entry.get("text", ""))
             verse = int(entry["verse"])
@@ -245,16 +256,11 @@ class CommentaryWriter:
                 anchors[text] = entry
             covered[text].add(verse)
             # A repeated comment repeats its references; union them so a range that
-            # does differ verse to verse keeps every reference it carried.
+            # does differ verse to verse keeps every reference it carried. Insertion
+            # order is kept because references recognised in prose are published in
+            # the order the text cites them.
             for reference in entry.get("references", ()):
-                references[text][
-                    (
-                        reference.get("osis", ""),
-                        reference.get("book", 0),
-                        reference.get("chapter", 0),
-                        reference.get("verse", 0),
-                    )
-                ] = reference
+                references[text].setdefault(json.dumps(reference, sort_keys=True), reference)
 
         collected: list[dict[str, Any]] = []
         for text in order:
@@ -270,7 +276,7 @@ class CommentaryWriter:
             if anchor.get("osis"):
                 published["osis"] = str(anchor["osis"])
             published["text"] = text
-            related = [reference for _, reference in sorted(references[text].items())]
+            related = list(references[text].values())
             if related:
                 published["references"] = related
             collected.append(published)

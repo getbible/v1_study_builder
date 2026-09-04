@@ -8,7 +8,7 @@ from study_builder.dictionaries import (
     link_candidates,
     search_key,
 )
-from study_builder.models import NativeExport
+from study_builder.models import ModuleDescriptor, NativeExport
 
 
 def write(tmp_path, project_root, module, entries, metadata=None):
@@ -180,3 +180,61 @@ def test_whole_dictionary_embeds_entries_in_index_order(
     assert complete["schema"] == "getbible-dictionary-v1"
     assert complete["entries"] == entries
     assert record["bytes"] == (tmp_path / "strongsgreek.json").stat().st_size
+
+
+def test_references_written_in_prose_are_published_when_markup_carries_none(
+    tmp_path, project_root, greek_dictionary_module
+) -> None:
+    text = "son of Adam, slain by Cain Ge 4:2,8; Mt 23:35; Heb 11:4; 12:24"
+    write(
+        tmp_path,
+        project_root,
+        greek_dictionary_module,
+        [
+            {"key": "ABEL", "raw": text, "plain": text, "html": ""},
+            {
+                "key": "CAIN",
+                "raw": '<reference osisRef="Gen.4.1">Gen. 4:1</reference> slew Ge 4:8',
+                "plain": "Gen. 4:1 slew Ge 4:8",
+                "html": "",
+            },
+            {"key": "SETH", "raw": "third son", "plain": "third son", "html": ""},
+        ],
+    )
+    abel = json.loads((tmp_path / "strongsgreek/k-ABEL.json").read_text(encoding="utf-8"))
+    cain = json.loads((tmp_path / "strongsgreek/k-CAIN.json").read_text(encoding="utf-8"))
+    seth = json.loads((tmp_path / "strongsgreek/k-SETH.json").read_text(encoding="utf-8"))
+    assert abel["text"] == text
+    assert [(item["text"], item["ref"]) for item in abel["references"]] == [
+        ("Ge 4:2,8", "Ge 4:2,8"),
+        ("Mt 23:35", "Mt 23:35"),
+        ("Heb 11:4", "Heb 11:4"),
+        ("12:24", "Heb 12:24"),
+    ]
+    assert abel["references"][3] == {
+        "text": "12:24",
+        "ref": "Heb 12:24",
+        "osis": "Heb.12.24",
+        "book": 58,
+        "chapter": 12,
+        "verse": 24,
+    }
+    # Marked-up references are authoritative; the prose is not parsed beside them.
+    assert cain["references"] == [{"osis": "Gen.4.1", "book": 1, "chapter": 4, "verse": 1}]
+    assert "references" not in seth
+
+
+def test_prose_references_follow_the_module_language(tmp_path, project_root) -> None:
+    module = ModuleDescriptor(
+        name="Klingon",
+        conf_path="mods.d/klingon.conf",
+        fields={"description": ("Klingon",), "lang": ("tlh",), "distributionlicense": ("PD",)},
+    )
+    write(
+        tmp_path,
+        project_root,
+        module,
+        [{"key": "A", "raw": "Ge 4:2", "plain": "Ge 4:2", "html": ""}],
+    )
+    document = json.loads((tmp_path / "klingon/k-A.json").read_text(encoding="utf-8"))
+    assert "references" not in document

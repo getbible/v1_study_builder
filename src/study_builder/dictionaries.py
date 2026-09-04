@@ -16,6 +16,7 @@ from jsonschema import validate
 from study_builder.books import BookRegistry
 from study_builder.content import extract_osis_references, public_content
 from study_builder.models import ModuleDescriptor, NativeExport
+from study_builder.references import ReferenceParser
 from study_builder.util import (
     DOCUMENT_CEILING_BYTES,
     enforce_document_ceiling,
@@ -144,11 +145,13 @@ class DictionaryWriter:
         self.books = books
         self.max_document_bytes = max_document_bytes
         self.schema = read_json(schemas_dir / "dictionary-entry.schema.json")
+        self.parser: ReferenceParser | None = None
 
     def write(self, module: ModuleDescriptor, exported: NativeExport) -> tuple[dict, dict]:
         module_id = slug(module.name)
         module_root = self.root / module_id
         prefix = strong_prefix(module, exported.metadata)
+        self.parser = ReferenceParser(self.books, module.language)
 
         staged = self._stage(exported, prefix)
         self._resolve_links(staged)
@@ -314,6 +317,11 @@ class DictionaryWriter:
             normalized = self.books.reference(reference)
             if normalized:
                 references.append(normalized)
+        if not references and self.parser is not None:
+            # The source did not mark its references up, so they exist only as
+            # prose. Recognise them there, so a client can still link the word to
+            # the Bible without parsing the text itself.
+            references = self.parser.extract(content["text"])
         if references:
             document["references"] = references
         validate(document, self.schema)

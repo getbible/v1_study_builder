@@ -294,3 +294,31 @@ def test_commentary_skips_entries_without_a_bible_coordinate(
         ],
     )
     assert record["entry_count"] == 1
+
+
+def test_prose_references_inherit_the_commented_book_and_chapter(
+    tmp_path, project_root, commentary_module
+) -> None:
+    write(
+        tmp_path,
+        project_root,
+        commentary_module,
+        [
+            entry("John.3.16", 43, 3, 16, "Compare ver. 17 and 1:1 with Ro 5:8; 6:23."),
+            entry("John.3.17", 43, 3, 17, "Compare ver. 17 and 1:1 with Ro 5:8; 6:23."),
+            entry("John.0.0", 43, 0, 0, "The Gospel opens at 1:1."),
+        ],
+    )
+    chapter = json.loads((tmp_path / "testcom/43/3.json").read_text(encoding="utf-8"))
+    published = chapter["entries"][0]
+    assert published["verses"] == [16, 17]
+    assert [(item["ref"], item["book"]) for item in published["references"]] == [
+        ("John 3:17", 43),
+        ("John 1:1", 43),
+        ("Ro 5:8", 45),
+        ("Ro 6:23", 45),
+    ]
+    introduction = json.loads((tmp_path / "testcom/43/0.json").read_text(encoding="utf-8"))
+    assert introduction["entries"][0]["references"] == [
+        {"text": "1:1", "ref": "John 1:1", "osis": "John.1.1", "book": 43, "chapter": 1, "verse": 1}
+    ]

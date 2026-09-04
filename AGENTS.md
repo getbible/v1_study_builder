@@ -50,6 +50,16 @@ Book and whole-commentary documents embed their parts byte-for-byte, so
 `book.chapters[n]` must stay identical to the chapter document served on its own —
 `scripts/validate_build.py` asserts this and it is the property clients rely on.
 
+`references` items carry Bible API v3 coordinates in both APIs. Those recognised in
+plain text by `src/study_builder/references.py` additionally carry `text` (the
+citation exactly as the entry's text spells it) and `ref` (the same citation with
+the book restored), and may carry `verses`; an item without `verse` covers the whole
+chapter. Text is never rewritten to make a citation easier to recognise. Prose is
+only parsed for entries whose source markup carries no references, and only in
+languages `conf/book_registry.json` lists spellings for; the same file's KJV verse
+counts expand ranges that cross a chapter boundary. Adding a language or a spelling
+is a registry change, not a code change.
+
 Dictionary Strong's keys remain compatible with Bible API v3 (`G3056`, `H0430`).
 Repeated dictionary keys retain the unsuffixed direct path for their first
 definition; later definitions use deterministic `--2`, `--3`, and subsequent
