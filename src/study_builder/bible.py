@@ -328,13 +328,15 @@ class BibleApi:
             return [t for t in catalogue.values() if t.versification.casefold() == name.casefold()]
 
         def best(candidates: list[Translation], name: str) -> Translation | None:
+            # The module's language first; then the translation named after the
+            # versification itself (kjv for KJV, vulgate for Vulg); then alphabetical.
             if not candidates:
                 return None
             return min(
                 candidates,
                 key=lambda t: (
                     t.primary_language != lang,
-                    t.abbreviation != name.casefold(),
+                    not t.abbreviation.startswith(name.casefold()),
                     t.abbreviation,
                 ),
             )
