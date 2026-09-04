@@ -105,7 +105,12 @@ class BuildPipeline:
         """The reference engine for one module: the Bible in its versification and language."""
         versification = module.first("versification") or str(metadata.get("versification") or "")
         return ReferenceEngine.for_module(
-            self.bible, self.books, module.language, versification, self.config.aliases_dir
+            self.bible,
+            self.books,
+            module.language,
+            versification,
+            self.config.aliases_dir,
+            module_id=slug(module.name),
         )
 
     def _catalog(self) -> list[ModuleDescriptor]:

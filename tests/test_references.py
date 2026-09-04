@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from study_builder.books import BookRegistry
-from study_builder.references import MarkupReference, ReferenceEngine, split_ordinal
+from study_builder.references import MarkupReference, ReferenceEngine, _locate, split_ordinal
 
 
 @pytest.fixture(scope="module")
@@ -544,3 +544,211 @@ def test_documents_stay_valid_json_in_text_order(english) -> None:
     round_trip = json.loads(json.dumps(items))
     assert round_trip == items
     assert [item["text"] for item in items] == ["Ex 28:1", "29:9", "Nu 17", "18:1", "Ps 99:6"]
+
+
+def test_verses_after_a_cross_chapter_range_belong_to_the_chapter_it_ends_in(english) -> None:
+    items = english.extract("1Ki 15:1-16:7,12; 20")
+    assert [(item["ref"], item.get("verse")) for item in items] == [
+        ("1 Kings 15:1-34", 1),
+        ("1 Kings 16:1-7,12", 1),
+        ("1 Kings 20", None),
+    ]
+    assert [item["text"] for item in items] == ["1Ki 15:1-16:7,12", "1Ki 15:1-16:7,12", "20"]
+
+
+def test_a_verse_marker_before_a_chapter_and_verse_is_not_a_verse_citation(english) -> None:
+    items = english.extract("Ex 3:2 ... ver. 1:22 and A.V. 2:14 read")
+    assert [(item["text"], item["ref"]) for item in items] == [
+        ("Ex 3:2", "Exodus 3:2"),
+        ("1:22", "Exodus 1:22"),
+        ("2:14", "Exodus 2:14"),
+    ]
+
+
+def test_thousands_separators_and_tallies_are_not_chapters(english) -> None:
+    assert [item["ref"] for item in english.extract("Ge 46:26; 2,322 men")] == ["Genesis 46:26"]
+    assert [item["ref"] for item in english.extract("Mt 14:21, 5,000 fed")] == ["Matthew 14:21"]
+    assert english.extract("the Exodus 1 | | 430 years") == []
+    assert [item["ref"] for item in english.extract("Ex 28; 29, and Le 8")] == [
+        "Exodus 28",
+        "Leviticus 8",
+    ]
+
+
+def test_a_number_before_a_name_is_its_ordinal_only_where_the_chapter_exists(english) -> None:
+    # 3 John has no chapter 17, so the 3 ends the range and John 17 begins.
+    items = english.extract("Heb 1:1-3 Joh 17:2")
+    assert [(item["text"], item["ref"]) for item in items] == [
+        ("Heb 1:1-3", "Hebrews 1:1-3"),
+        ("Joh 17:2", "John 17:2"),
+    ]
+    assert [item["ref"] for item in english.extract("Ps 1:1, 2 Sam 3:4")] == [
+        "Psalms 1:1",
+        "2 Samuel 3:4",
+    ]
+    assert [item["ref"] for item in english.extract("3 Joh 1:2")] == ["3 John 1:2"]
+
+
+def test_a_bare_number_after_a_one_chapter_book_is_a_verse(english) -> None:
+    assert [item["ref"] for item in english.extract("II Pe 2:10, Jude 7, Re 1:10")] == [
+        "2 Peter 2:10",
+        "Jude 1:7",
+        "Revelation 1:10",
+    ]
+    assert [item["ref"] for item in english.extract("Jude 7; 14-15 and Ob 3, 5")] == [
+        "Jude 1:7",
+        "Jude 1:14-15",
+        "Obadiah 1:3,5",
+    ]
+    assert [item["ref"] for item in english.extract("Jude 1; 1:3")] == ["Jude 1", "Jude 1:3"]
+
+
+def test_a_bracketed_chapter_list_is_a_citation_and_a_bracketed_number_still_names_the_book(
+    english,
+) -> None:
+    items = english.extract("Daniel (8; 9:26, 27) foretells")
+    assert [(item["text"], item["ref"]) for item in items] == [
+        ("8", "Daniel 8"),
+        ("9:26, 27", "Daniel 9:26-27"),
+    ]
+    items = english.extract("Daniel (8) and later 9:26")
+    assert [(item["text"], item["ref"]) for item in items] == [("9:26", "Daniel 9:26")]
+    assert english.extract("PHILIP (1) 3:4") == []
+
+
+def test_the_tail_of_another_works_citation_does_not_leak(english) -> None:
+    assert english.extract("Ge 6:2 as Enoch 6:6, 8:1 tells") == [
+        {
+            "text": "Ge 6:2",
+            "ref": "Genesis 6:2",
+            "osis": "Gen.6.2",
+            "book": 1,
+            "chapter": 6,
+            "verse": 2,
+        }
+    ]
+
+
+def test_fractions_titles_and_sigla(english) -> None:
+    assert english.extract("De 1:1 measures 7:1/4 acres") == [
+        {
+            "text": "De 1:1",
+            "ref": "Deuteronomy 1:1",
+            "osis": "Deut.1.1",
+            "book": 5,
+            "chapter": 1,
+            "verse": 1,
+        }
+    ]
+    assert [item["ref"] for item in english.extract("Jer 1:1; Ep. Jer 5, 63")] == ["Jeremiah 1:1"]
+    assert [item["ref"] for item in english.extract("Test. Levi 3:4 and Levit 4:5")] == [
+        "Leviticus 4:5"
+    ]
+    assert [item["ref"] for item in english.extract("Ps 22:1 (LXX 21:2) and Rec. 22:3")] == [
+        "Psalms 22:1",
+        "Psalms 21:2",
+        "Psalms 22:3",
+    ]
+    assert english.extract("Ge 1:1 sura 2:3") == [
+        {
+            "text": "Ge 1:1",
+            "ref": "Genesis 1:1",
+            "osis": "Gen.1.1",
+            "book": 1,
+            "chapter": 1,
+            "verse": 1,
+        }
+    ]
+
+
+def test_dual_septuagint_and_hebrew_numbering_publishes_the_api_chapter(english) -> None:
+    items = english.extract("Ps 88 (89):40; 50 (51):9, Je 45 (38):11")
+    assert [(item["text"], item["ref"]) for item in items] == [
+        ("Ps 88 (89):40", "Psalms 89:40"),
+        ("50 (51):9", "Psalms 51:9"),
+        ("Je 45 (38):11", "Jeremiah 38:11"),
+    ]
+
+
+def test_roman_numeral_chapters_directly_after_a_book_name(english) -> None:
+    items = english.extract("Rom. i. 28. Luke xvi. 9, and i. e. Ps. cxix. 105")
+    assert [(item["text"], item["ref"]) for item in items] == [
+        ("Rom. i. 28", "Romans 1:28"),
+        ("Luke xvi. 9", "Luke 16:9"),
+        ("Ps. cxix. 105", "Psalms 119:105"),
+    ]
+    assert english.extract("Luke xvi. and i. e. nothing") == []
+
+
+def test_a_module_may_carry_its_own_alias_table(bible_tree, tmp_path, registry, aliases_dir):
+    from study_builder.bible import BibleApi
+
+    api = BibleApi(bible_tree, cache_dir=tmp_path / "cache")
+    abbott = ReferenceEngine.for_module(
+        api, registry, "en", "KJV", aliases_dir, module_id="abbottsmith"
+    )
+    assert abbott.describe()["aliases"] == ["modules/abbottsmith.json", "en.json"]
+    items = abbott.extract("in LXX: I Ki 14:41, III Ki 9:4, Ez 16:49, Da TH 9:23, Za 3:4, Ju 7")
+    assert [(item["text"], item["ref"]) for item in items] == [
+        ("I Ki 14:41", "1 Samuel 14:41"),
+        ("III Ki 9:4", "1 Kings 9:4"),
+        ("Ez 16:49", "Ezekiel 16:49"),
+        ("Da TH 9:23", "Daniel 9:23"),
+        ("Za 3:4", "Zechariah 3:4"),
+        ("Ju 7", "Jude 1:7"),
+    ]
+    plain = ReferenceEngine.for_module(api, registry, "en", "KJV", aliases_dir, module_id="other")
+    assert plain.describe()["aliases"] == ["en.json"]
+    assert [item["ref"] for item in plain.extract("I Ki 14:21, Ez 6:9, Ju 7")] == [
+        "1 Kings 14:21",
+        "Ezra 6:9",
+    ]
+
+
+def test_a_dotted_wedged_digit_is_the_numbers_last_digit(engines) -> None:
+    vietnamese = engines("vi", "KJV")
+    assert [item["ref"] for item in vietnamese.extract("H1162.Ma 1:5")] == ["Ma-thi-ơ 1:5"]
+
+
+def test_an_entry_headed_by_a_book_name_cites_its_own_book(english) -> None:
+    items = english.extract("A prophet (7:14, 15) of Tekoa", book=english.aliases.resolve("Amos"))
+    assert [(item["text"], item["ref"]) for item in items] == [("7:14, 15", "Amos 7:14-15")]
+    assert english.aliases.resolve("Tekoa") is None
+
+
+def test_a_display_without_a_book_is_located_at_its_own_citation(english) -> None:
+    from study_builder.content import extract_markup_references
+
+    raw = 'Compare Gen 1:1 and <scripRef passage="Ex 1:1">1:1</scripRef> also 1:2.'
+    text = "Compare Gen 1:1 and 1:1 also 1:2."
+    items = english.extract(text, markup=extract_markup_references(raw))
+    assert [(item["text"], item["ref"]) for item in items] == [
+        ("Gen 1:1", "Genesis 1:1"),
+        ("1:1", "Exodus 1:1"),
+        ("1:2", "Exodus 1:2"),
+    ]
+    # The one scripRef in the text is the one the markup counts as second.
+    assert _locate(text, "1:1", 0, 1) == (20, 23)
+    assert _locate(text, "1:1", 21, 0) is None
+    assert _locate(text, "1:1", 0, 9) == (12, 15)
+
+
+def test_a_scripref_with_passage_and_parsed_is_one_citation(english) -> None:
+    from study_builder.content import extract_markup_references
+
+    raw = 'as in <scripRef passage="Ge 4:2,8" parsed="Gen.4.2|Gen.4.8">Ge 4:2,8</scripRef> and'
+    html = (
+        'as in <a href="passagestudy.jsp?action=showRef&type=scripRef&value=Ge+4%3A2%2C8'
+        '&module=">Ge 4:2,8</a> and'
+    )
+    assert english.extract("as in Ge 4:2,8 and", markup=extract_markup_references(raw, html)) == [
+        {
+            "text": "Ge 4:2,8",
+            "ref": "Genesis 4:2,8",
+            "osis": "Gen.4.2",
+            "book": 1,
+            "chapter": 4,
+            "verse": 2,
+            "verses": [2, 8],
+        }
+    ]
