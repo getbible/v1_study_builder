@@ -298,6 +298,7 @@ _NOT_A_CITATION = frozenset(
 )
 
 WHOLE_CHAPTER = object()
+_UNSEARCHED = object()
 
 
 @dataclass(frozen=True)
@@ -352,18 +353,25 @@ def _ordinal_value(value: str) -> int:
     return _ORDINAL_WORDS[folded]
 
 
-def _name_pattern(name: str) -> str:
-    # The first letter must be written as listed; the rest may vary in case, so
-    # "GENESIS 1:1" is recognised but a lowercase "is 6:1" is left alone. Later words
-    # vary freely: the Swedish table lists "Höga v" and the module writes "Höga V.".
-    words = []
-    for index, word in enumerate(name.split(" ")):
-        if index == 0:
-            rest = f"(?i:{re.escape(word[1:])})" if len(word) > 1 else ""
-            words.append(re.escape(word[0]) + rest)
-        else:
-            words.append(f"(?i:{re.escape(word)})")
-    return f"{_SP}+".join(words)
+def _names_pattern(names: Iterable[str]) -> str:
+    """One alternation for every spelling, grouped by first letter.
+
+    The first letter must be written as listed; the rest may vary in case, so
+    "GENESIS 1:1" is recognised but a lowercase "is 6:1" is left alone, and later
+    words vary freely: the Swedish table lists "Höga v" and the module writes "Höga
+    V.". Grouping by first letter lets the regex engine reject a position after one
+    character instead of trying several hundred spellings there; on a long
+    encyclopaedia article that is the difference between seconds and minutes.
+    """
+    groups: dict[str, list[str]] = {}
+    for name in sorted(set(names), key=lambda value: (-len(value), value)):
+        words = name.split(" ")
+        rest = re.escape(words[0][1:]) + "".join(f"{_SP}+{re.escape(w)}" for w in words[1:])
+        groups.setdefault(name[0], []).append(rest)
+    parts = []
+    for first, rests in sorted(groups.items()):
+        parts.append(re.escape(first) + f"(?i:{'|'.join(rests)})")
+    return "|".join(parts)
 
 
 def _letters(value: str) -> int:
@@ -463,10 +471,9 @@ class BookAliases:
             bare.setdefault(rest.casefold(), rest)
         if not bare:
             return None
-        ordered = sorted(bare.values(), key=lambda value: (-len(value), value))
         return re.compile(
             rf"(?<![{_UPPER}])(?:(?P<ordinal>{_ORDINAL}){_SP}*\.?{_SP}*\n?{_SP}*)?"
-            rf"(?P<name>{'|'.join(_name_pattern(name) for name in ordered)})"
+            rf"(?P<name>{_names_pattern(bare.values())})"
             rf"(?:\.{_SP}*|,{_SP}+|{_SP}+|(?={_SP}*\n)|(?=\d{{1,3}}:\d))"
             rf"(?=\n?{_SP}*[(\[]?{_SP}*\d)"
         )
@@ -766,17 +773,21 @@ class _Scan:
         position = 0
         guard_index = 0
         length = len(self.text)
+        # The next candidate of each kind is searched for once and kept until the scan
+        # passes it; searching all three afresh at every step reads a long entry
+        # once per citation, which the largest encyclopaedia articles cannot afford.
+        cached: dict[str, tuple[int, Any] | None] = {}
         while position < length:
             candidates: list[tuple[int, str, Any]] = []
-            book = self.aliases.find(self.text, position)
-            if book:
-                candidates.append((book[0], "book", book))
-            prose = _PROSE.search(self.text, position)
-            if prose:
-                candidates.append((prose.start(), "prose", prose))
-            verse_only = _VERSE_ONLY.search(self.text, position)
-            if verse_only:
-                candidates.append((verse_only.start(), "verse", verse_only))
+            for kind in ("book", "prose", "verse"):
+                found = cached.get(kind, _UNSEARCHED)
+                if found is _UNSEARCHED or (found is not None and found[0] < position):
+                    # None is remembered too: a kind with no match left is not
+                    # searched for again, or every step would read to the end.
+                    found = self._next(kind, position)
+                    cached[kind] = found
+                if found is not None:
+                    candidates.append((found[0], kind, found[1]))
             if not candidates:
                 break
             start, kind, match = min(candidates, key=lambda item: item[0])
@@ -798,6 +809,15 @@ class _Scan:
             else:
                 position = self._verse_citation(match)
         return self.found
+
+    def _next(self, kind: str, position: int) -> tuple[int, Any] | None:
+        """The next candidate of one kind at or after ``position``: its start and match."""
+        if kind == "book":
+            found = self.aliases.find(self.text, position)
+            return (found[0], found) if found else None
+        pattern = _PROSE if kind == "prose" else _VERSE_ONLY
+        match = pattern.search(self.text, position)
+        return (match.start(), match) if match else None
 
     # -- citation forms -----------------------------------------------------
 
@@ -894,7 +914,9 @@ class _Scan:
         index = position
         while index > 0 and self.text[index - 1] in _SP_CHARS + _CLOSERS + ",;":
             index -= 1
-        match = _PRECEDING_WORD.search(self.text, 0, index)
+        # Only the word ending here matters; an unanchored search from the start of a
+        # long article would read all of it for every bookless citation.
+        match = _PRECEDING_WORD.search(self.text, max(0, index - 64), index)
         if match is None:
             return True
         word = match.group(1).strip(".'’-")
