@@ -50,15 +50,25 @@ Book and whole-commentary documents embed their parts byte-for-byte, so
 `book.chapters[n]` must stay identical to the chapter document served on its own —
 `scripts/validate_build.py` asserts this and it is the property clients rely on.
 
-`references` items carry Bible API v3 coordinates in both APIs. Those recognised in
-plain text by `src/study_builder/references.py` additionally carry `text` (the
-citation exactly as the entry's text spells it) and `ref` (the same citation with
-the book restored), and may carry `verses`; an item without `verse` covers the whole
-chapter. Text is never rewritten to make a citation easier to recognise. Prose is
-only parsed for entries whose source markup carries no references, and only in
-languages `conf/book_registry.json` lists spellings for; the same file's KJV verse
-counts expand ranges that cross a chapter boundary. Adding a language or a spelling
-is a registry change, not a code change.
+`references` items carry Bible API coordinates in both APIs, plus `ref`, the reference
+written canonically in a form the Query API accepts, and `text` when the citation was
+located in the entry text. They are produced by one engine,
+`src/study_builder/references.py`, from markup and prose alike, and every coordinate it
+publishes exists in the Bible API. The shape of the Bible — which books a versification
+has, their chapter and verse counts, their names in a language — is read from
+`api.getbible.net/v2` by `src/study_builder/bible.py` and cached under `.work/bible/`
+with the published hash; never carry chapter or verse counts, or per-language book
+names, in this repository. `conf/book_registry.json` holds only the book numbering and
+OSIS identifiers. Book names are resolved through the librarian (`getbible` on PyPI, the
+parser behind `query.getbible.net`); `conf/book_aliases/{language}.json` supplements its
+tables in their own format and is the only place a spelling is added. Text is never
+rewritten to make a citation easier to recognise.
+
+Text is SWORD's `stripped` projection, except for ThML modules, whose source is projected
+by `src/study_builder/content.py` because SWORD's ThML plain filter discards every line
+break. The projection keeps SWORD's conventions; a change to it changes the words of every
+ThML module and needs the smoke builds. Every text is normalised the same way. Module bytes
+UTF-8 cannot read are decoded as Windows-1252, never replaced.
 
 Dictionary Strong's keys remain compatible with Bible API v3 (`G3056`, `H0430`).
 Repeated dictionary keys retain the unsuffixed direct path for their first

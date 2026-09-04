@@ -25,6 +25,7 @@ from test_pipeline_build import (  # noqa: E402
 
 from study_builder import pipeline as pipeline_module  # noqa: E402
 from study_builder.pipeline import BuildPipeline, PipelineConfig  # noqa: E402
+from support.bible_fixture import write_bible_tree  # noqa: E402
 
 
 def main() -> int:
@@ -48,6 +49,8 @@ def main() -> int:
             schemas_dir=REPOSITORY / "schemas",
             engine_manifest_path=REPOSITORY / "conf/getbiblesword.json",
             engine_schema_path=REPOSITORY / "schemas/getbiblesword-ndjson-v1.schema.json",
+            aliases_dir=REPOSITORY / "conf/book_aliases",
+            bible_api=str(write_bible_tree(target / "bible-api" / "v2")),
         )
     ).run()
     print(f"built {report.built}")

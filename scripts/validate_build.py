@@ -30,6 +30,27 @@ def _assert_composed(composed: list[Any], parts: list[Path], where: str) -> None
             raise RuntimeError(f"{where} does not match the document served at {path}")
 
 
+def _assert_references(document: dict[str, Any], where: Path) -> int:
+    """Every reference resolves to a coordinate, states its canonical ref, and if it says
+    where the text cites it, the text really does."""
+    text = str(document.get("text", ""))
+    references = document.get("references", [])
+    seen: set[tuple[Any, ...]] = set()
+    for item in references:
+        for name in ("ref", "osis", "book", "chapter"):
+            if name not in item:
+                raise RuntimeError(f"{where} publishes a reference without {name}")
+        if "verses" in item and ("verse" not in item or item["verse"] != min(item["verses"])):
+            raise RuntimeError(f"{where} publishes a verse list not anchored at its first verse")
+        if "text" in item and item["text"] not in text:
+            raise RuntimeError(f"{where} cites {item['text']!r}, which its text does not contain")
+        key = (item["book"], item["chapter"], item.get("verse"), tuple(item.get("verses", ())))
+        if key in seen:
+            raise RuntimeError(f"{where} publishes the same reference twice")
+        seen.add(key)
+    return len(references)
+
+
 def _assert_no_repeated_text(chapter: dict[str, Any], where: Path) -> None:
     """The whole point of the collapse: one comment is stored once, not once per verse.
 
@@ -76,6 +97,7 @@ def validate_commentary(root: Path, complete_path: Path) -> dict[str, Any]:
         raise RuntimeError("Commentary entry is not linked to a Bible API coordinate")
     _assert_no_repeated_text(chapter, chapter_paths[0])
     _reject_markup(chapter, "chapter")
+    references = sum(_assert_references(item, chapter_paths[0]) for item in chapter["entries"])
 
     complete = read_json(complete_path)
     if complete.get("schema") != "getbible-commentary-v1":
@@ -89,6 +111,8 @@ def validate_commentary(root: Path, complete_path: Path) -> dict[str, Any]:
         "entries": metadata["entry_count"],
         "bytes": metadata["bytes"],
         "introductions": sum(1 for record in books["books"] if 0 in record["chapters"]),
+        "references_in_first_chapter": references,
+        "bible": metadata.get("references"),
     }
 
 
@@ -120,12 +144,23 @@ def validate_dictionary(root: Path, complete_path: Path) -> dict[str, Any]:
     _assert_composed(complete["entries"], entry_paths, f"{complete_path}.entries")
 
     linked = sum(1 for entry in complete["entries"] if entry.get("see_also"))
+    references = sum(_assert_references(entry, complete_path) for entry in complete["entries"])
+    cited = sum(1 for entry in complete["entries"] if entry.get("references"))
+    unbroken = sum(
+        1
+        for entry in complete["entries"]
+        if len(entry["text"]) > 1500 and "\n" not in entry["text"]
+    )
     return {
         "entries": metadata["entry_count"],
         "unique_keys": metadata["unique_key_count"],
         "strong_prefix": metadata["strong_prefix"],
         "bytes": metadata["bytes"],
         "entries_with_links": linked,
+        "entries_with_references": cited,
+        "references": references,
+        "long_entries_without_a_break": unbroken,
+        "bible": metadata.get("references"),
     }
 
 

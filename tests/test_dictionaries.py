@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from study_builder.books import BookRegistry
 from study_builder.dictionaries import (
     DictionaryWriter,
@@ -11,11 +13,19 @@ from study_builder.dictionaries import (
 from study_builder.models import ModuleDescriptor, NativeExport
 
 
-def write(tmp_path, project_root, module, entries, metadata=None):
+@pytest.fixture(autouse=True)
+def _engine(reference_engine, shared_bible_api):
+    global ENGINE, SHARED_API
+    ENGINE = reference_engine
+    SHARED_API = shared_bible_api
+
+
+def write(tmp_path, project_root, module, entries, metadata=None, references=None):
     writer = DictionaryWriter(
         tmp_path,
         BookRegistry(project_root / "conf/book_registry.json"),
         project_root / "schemas",
+        references=references or ENGINE,
     )
     return writer.write(module, NativeExport(metadata=metadata or {}, entries=entries))
 
@@ -66,7 +76,7 @@ def test_dictionary_emits_direct_strong_lookup(
             {
                 "record_type": "entry",
                 "key": "03056",
-                "raw": "See John.1.1",
+                "raw": 'See <ref osisRef="John.1.1">John 1:1</ref>',
                 "plain": "logos: a word",
                 "html": "<p><em>logos</em>: a word</p>",
             }
@@ -80,7 +90,9 @@ def test_dictionary_emits_direct_strong_lookup(
     assert document["aliases"] == ["03056", "G3056"]
     assert document["text"] == "logos: a word"
     assert "html" not in document
-    assert document["references"] == [{"osis": "John.1.1", "book": 43, "chapter": 1, "verse": 1}]
+    assert document["references"] == [
+        {"ref": "John 1:1", "osis": "John.1.1", "book": 43, "chapter": 1, "verse": 1}
+    ]
     assert metadata["index_url"] == "index.json"
 
 
@@ -182,7 +194,7 @@ def test_whole_dictionary_embeds_entries_in_index_order(
     assert record["bytes"] == (tmp_path / "strongsgreek.json").stat().st_size
 
 
-def test_references_written_in_prose_are_published_when_markup_carries_none(
+def test_references_are_read_from_prose_and_markup_alike(
     tmp_path, project_root, greek_dictionary_module
 ) -> None:
     text = "son of Adam, slain by Cain Ge 4:2,8; Mt 23:35; Heb 11:4; 12:24"
@@ -194,8 +206,8 @@ def test_references_written_in_prose_are_published_when_markup_carries_none(
             {"key": "ABEL", "raw": text, "plain": text, "html": ""},
             {
                 "key": "CAIN",
-                "raw": '<reference osisRef="Gen.4.1">Gen. 4:1</reference> slew Ge 4:8',
-                "plain": "Gen. 4:1 slew Ge 4:8",
+                "raw": '<reference osisRef="Gen.4.1">Gen. 4:1</reference> slew Ge 4:8; see 9:20',
+                "plain": "Gen. 4:1 slew Ge 4:8; see 9:20",
                 "html": "",
             },
             {"key": "SETH", "raw": "third son", "plain": "third son", "html": ""},
@@ -206,35 +218,100 @@ def test_references_written_in_prose_are_published_when_markup_carries_none(
     seth = json.loads((tmp_path / "strongsgreek/k-SETH.json").read_text(encoding="utf-8"))
     assert abel["text"] == text
     assert [(item["text"], item["ref"]) for item in abel["references"]] == [
-        ("Ge 4:2,8", "Ge 4:2,8"),
-        ("Mt 23:35", "Mt 23:35"),
-        ("Heb 11:4", "Heb 11:4"),
-        ("12:24", "Heb 12:24"),
+        ("Ge 4:2,8", "Genesis 4:2,8"),
+        ("Mt 23:35", "Matthew 23:35"),
+        ("Heb 11:4", "Hebrews 11:4"),
+        ("12:24", "Hebrews 12:24"),
     ]
     assert abel["references"][3] == {
         "text": "12:24",
-        "ref": "Heb 12:24",
+        "ref": "Hebrews 12:24",
         "osis": "Heb.12.24",
         "book": 58,
         "chapter": 12,
         "verse": 24,
     }
-    # Marked-up references are authoritative; the prose is not parsed beside them.
-    assert cain["references"] == [{"osis": "Gen.4.1", "book": 1, "chapter": 4, "verse": 1}]
+    # The markup is authoritative for what it covers; the prose around it is read too.
+    assert [(item["text"], item["ref"]) for item in cain["references"]] == [
+        ("Gen. 4:1", "Genesis 4:1"),
+        ("Ge 4:8", "Genesis 4:8"),
+        ("9:20", "Genesis 9:20"),
+    ]
     assert "references" not in seth
 
 
-def test_prose_references_follow_the_module_language(tmp_path, project_root) -> None:
+def test_a_language_without_tables_reads_the_api_names_and_the_shape_spellings(
+    tmp_path, project_root
+) -> None:
     module = ModuleDescriptor(
         name="Klingon",
         conf_path="mods.d/klingon.conf",
         fields={"description": ("Klingon",), "lang": ("tlh",), "distributionlicense": ("PD",)},
+    )
+    from study_builder.books import BookRegistry as Registry
+    from study_builder.references import ReferenceEngine
+
+    engine = ReferenceEngine.for_module(
+        SHARED_API,
+        Registry(project_root / "conf/book_registry.json"),
+        "tlh",
+        "",
+        project_root / "conf/book_aliases",
     )
     write(
         tmp_path,
         project_root,
         module,
         [{"key": "A", "raw": "Ge 4:2", "plain": "Ge 4:2", "html": ""}],
+        references=engine,
     )
     document = json.loads((tmp_path / "klingon/k-A.json").read_text(encoding="utf-8"))
-    assert "references" not in document
+    assert document["references"] == [
+        {
+            "text": "Ge 4:2",
+            "ref": "Genesis 4:2",
+            "osis": "Gen.4.2",
+            "book": 1,
+            "chapter": 4,
+            "verse": 2,
+        }
+    ]
+    metadata = json.loads((tmp_path / "klingon/metadata.json").read_text(encoding="utf-8"))
+    assert metadata["references"]["names"] == "klv"
+    assert metadata["references"]["translations"] == ["kjv", "kjva"]
+
+
+def test_thml_text_keeps_its_breaks_and_markup_passages(tmp_path, project_root) -> None:
+    module = ModuleDescriptor(
+        name="Torrey",
+        conf_path="mods.d/torrey.conf",
+        fields={
+            "description": ("Torrey",),
+            "lang": ("en",),
+            "sourcetype": ("ThML",),
+            "distributionlicense": ("Public Domain",),
+        },
+    )
+    raw = (
+        '- God condemns <scripRef passage="Ge 11:7">Ge 11:7</scripRef>; Isa 5:8<br>'
+        "- Christ condemns Mt 18:1,3,4; 20:25<br>\n- Saints avoid Ps 131:1"
+    )
+    write(
+        tmp_path,
+        project_root,
+        module,
+        [{"key": "AMBITION", "raw": raw, "plain": "flattened by SWORD", "html": ""}],
+    )
+    document = json.loads((tmp_path / "torrey/k-AMBITION.json").read_text(encoding="utf-8"))
+    assert document["text"] == (
+        "- God condemns Ge 11:7; Isa 5:8\n"
+        "- Christ condemns Mt 18:1,3,4; 20:25\n"
+        "- Saints avoid Ps 131:1"
+    )
+    assert [(item["text"], item["ref"]) for item in document["references"]] == [
+        ("Ge 11:7", "Genesis 11:7"),
+        ("Isa 5:8", "Isaiah 5:8"),
+        ("Mt 18:1,3,4", "Matthew 18:1,3-4"),
+        ("20:25", "Matthew 20:25"),
+        ("Ps 131:1", "Psalms 131:1"),
+    ]

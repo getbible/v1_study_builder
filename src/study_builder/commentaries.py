@@ -11,9 +11,10 @@ from jsonschema import validate
 
 from study_builder.books import BookRegistry
 from study_builder.chapter_spool import CommentaryChapterSpool
-from study_builder.content import extract_osis_references, public_content
+from study_builder.content import extract_markup_references, public_content
+from study_builder.dictionaries import source_type
 from study_builder.models import ModuleDescriptor, NativeExport
-from study_builder.references import ReferenceParser
+from study_builder.references import ReferenceEngine
 from study_builder.util import (
     DOCUMENT_CEILING_BYTES,
     enforce_document_ceiling,
@@ -41,17 +42,20 @@ class CommentaryWriter:
         books: BookRegistry,
         schemas_dir: Path,
         max_document_bytes: int = DOCUMENT_CEILING_BYTES,
+        *,
+        references: ReferenceEngine,
     ) -> None:
         self.root = root
         self.books = books
         self.max_document_bytes = max_document_bytes
         self.chapter_schema = read_json(schemas_dir / "commentary-chapter.schema.json")
-        self.parser: ReferenceParser | None = None
+        self.references = references
+        self.source_type = ""
 
     def write(self, module: ModuleDescriptor, exported: NativeExport) -> tuple[dict, dict]:
         module_id = slug(module.name)
         module_root = self.root / module_id
-        self.parser = ReferenceParser(self.books, module.language)
+        self.source_type = source_type(module, exported.metadata)
         chapter_files: dict[int, list[Path]] = defaultdict(list)
         chapter_counts: dict[int, list[tuple[int, int]]] = defaultdict(list)
         entry_count = 0
@@ -165,6 +169,7 @@ class CommentaryWriter:
         metadata = self._metadata(
             module, module_id, len(books_index), chapter_count, entry_count, storage
         )
+        metadata["references"] = self.references.describe()
         write_json(module_root / "metadata.json", metadata)
         record = {
             "id": module_id,
@@ -191,7 +196,7 @@ class CommentaryWriter:
             book = self.books.from_entry(source)
         except ValueError:
             return None
-        content = public_content(source)
+        content = public_content(source, source_type=self.source_type)
         if not content["text"]:
             return None
         entry: dict[str, Any] = {
@@ -203,20 +208,17 @@ class CommentaryWriter:
         if osis:
             entry["osis"] = osis
         entry.update(content)
-        related = []
-        for reference in extract_osis_references(
-            str(source.get("raw", "")), str(source.get("html", ""))
-        ):
-            normalized = self.books.reference(reference)
-            if normalized:
-                related.append(normalized)
-        if not related and self.parser is not None:
-            # No markup carried the references, so recognise them in the prose. A
-            # comment cites its own book when it names none, so that book and
-            # chapter seed what an unqualified "3:16" or "ver. 5" resolves to.
-            related = self.parser.extract(
-                content["text"], book=book.number, chapter=chapter if chapter > 0 else None
-            )
+        # What the markup cites is authoritative for the text it covers; the rest is
+        # read as prose. A comment cites its own book when it names none, so that book
+        # and chapter seed what an unqualified "3:16" or "ver. 5" resolves to.
+        related = self.references.extract(
+            content["text"],
+            markup=extract_markup_references(
+                str(source.get("raw", "")), str(source.get("html", ""))
+            ),
+            book=book.number,
+            chapter=chapter if chapter > 0 else None,
+        )
         if related:
             entry["references"] = related
         return entry

@@ -1,2 +1,2 @@
+getbible>=2.0.0,<3
 jsonschema>=4.23,<5
-

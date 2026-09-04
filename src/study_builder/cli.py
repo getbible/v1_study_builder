@@ -6,6 +6,7 @@ import logging
 import os
 from pathlib import Path
 
+from study_builder.bible import DEFAULT_BIBLE_API
 from study_builder.catalog import CATALOG_URL, classify, load_catalog
 from study_builder.engine import GetBibleSwordManager
 from study_builder.http import HttpClient
@@ -40,6 +41,18 @@ def parser() -> argparse.ArgumentParser:
     build.add_argument("--dist-dir", type=Path, default=root / "dist")
     build.add_argument("--policy", type=Path, default=root / "conf/module_policy.json")
     build.add_argument("--books", type=Path, default=root / "conf/book_registry.json")
+    build.add_argument(
+        "--book-aliases",
+        type=Path,
+        default=root / "conf/book_aliases",
+        help="Directory of per-language book spellings the librarian tables lack",
+    )
+    build.add_argument(
+        "--bible-api",
+        default=os.environ.get("STUDY_BUILDER_BIBLE_API", DEFAULT_BIBLE_API),
+        help="GetBible API v2 root (URL, or a directory with the same layout) that "
+        "references are checked against",
+    )
     build.add_argument("--schemas", type=Path, default=root / "schemas")
     configured_engine = os.environ.get("STUDY_BUILDER_GETBIBLESWORD", "").strip()
     build.add_argument(
@@ -118,6 +131,8 @@ def _build(args: argparse.Namespace) -> int:
         schemas_dir=args.schemas.resolve(),
         engine_manifest_path=args.engine_manifest.resolve(),
         engine_schema_path=args.engine_schema.resolve(),
+        aliases_dir=args.book_aliases.resolve(),
+        bible_api=args.bible_api,
         engine_path=args.engine.resolve() if args.engine else None,
         resource=args.resource,
         modules=frozenset(args.module),
