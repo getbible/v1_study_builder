@@ -130,6 +130,10 @@ def test_offline_mode_uses_the_cache_and_nothing_else(bible_tree, tmp_path) -> N
 def test_a_module_is_matched_by_versification_then_language(bible_api) -> None:
     assert bible_api.select("en", "KJV") == (["kjv", "kjva"], "kjv")
     assert bible_api.select("la", "Vulg") == (["vulgate"], "vulgate")
+    # With no French Vulgate, the translation named after the versification gives the
+    # shape, ahead of an alphabetically earlier English one.
+    assert bible_api.select("fr", "Vulg") == (["vulgate"], None)
+    assert bible_api.select("en", "Vulg") == (["douayrheims"], "douayrheims")
     assert bible_api.select("sv", "NRSVA") == (["swedish"], "swedish")
     # No translation declares a Luther versification, so the KJV family gives the shape and
     # the German translation gives the names.
