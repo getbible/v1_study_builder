@@ -53,7 +53,7 @@ def test_canon_keeps_only_the_shape_of_a_translation(bible_api) -> None:
     assert books[1].verse_count(51) is None
     assert books[19].verse_count(119) == 176
     assert 73 not in books
-    cached = json.loads((bible_api.cache_dir / "kjv.json").read_text(encoding="utf-8"))
+    cached = json.loads((bible_api.cache_dir / "shape" / "kjv.json").read_text(encoding="utf-8"))
     assert cached["schema"] == "study-builder-bible-canon-v1"
     assert cached["sha"] == bible_api.translations()["kjv"].sha
     assert "text" not in json.dumps(cached)
@@ -76,7 +76,7 @@ def test_an_unchanged_hash_does_not_download_the_translation_again(remote) -> No
 def test_a_changed_hash_refreshes_the_cached_shape(remote, bible_tree) -> None:
     api, http = remote
     api.canon("klv")
-    cache = api.cache_dir / "klv.json"
+    cache = api.cache_dir / "shape" / "klv.json"
     stale = json.loads(cache.read_text(encoding="utf-8"))
     stale["sha"] = "0" * 40
     stale["books"][0]["verses"] = [1]
@@ -107,7 +107,7 @@ def test_a_local_tree_without_hashes_is_hashed_on_the_spot(tmp_path) -> None:
     (tree / "klv.sha").unlink()
     api = BibleApi(tree, cache_dir=tmp_path / "cache")
     assert api.canon("klv")[1].name == "Genesis"
-    cached = json.loads((api.cache_dir / "klv.json").read_text(encoding="utf-8"))
+    cached = json.loads((api.cache_dir / "shape" / "klv.json").read_text(encoding="utf-8"))
     expected = hashlib.sha1((tree / "klv.json").read_bytes(), usedforsecurity=False).hexdigest()
     assert cached["sha"] == expected
 
@@ -175,3 +175,52 @@ def test_the_canon_of_a_module_unites_its_shape_and_names_its_books(bible_api) -
     assert vietnamese.name(43) == "Giăng"
     assert vietnamese.name(1) == "Genesis"
     assert vietnamese.has_book(19)
+
+
+def test_a_books_index_that_moved_without_the_translation_is_read_afresh(tmp_path) -> None:
+    tree = write_bible_tree(tmp_path / "v2", {"klv": TRANSLATIONS["klv"]})
+    cache = tmp_path / "cache"
+    BibleApi(tree, cache_dir=cache).canon("klv")
+    index = json.loads((tree / "klv/books.json").read_text(encoding="utf-8"))
+    index["1"]["name"] = "Other"
+    (tree / "klv/books.json").write_text(json.dumps(index), encoding="utf-8")
+    # The translation's hash is unchanged, so the cached shape would have been reused;
+    # the index no longer agrees with it, so the translation is read again and refused.
+    with pytest.raises(BibleApiError, match="books index"):
+        BibleApi(tree, cache_dir=cache).canon("klv")
+
+
+def test_a_corrupt_cache_is_reported_offline_and_replaced_online(tmp_path) -> None:
+    tree = write_bible_tree(tmp_path / "v2", {"klv": TRANSLATIONS["klv"]})
+    cache = tmp_path / "cache"
+    online = BibleApi(tree, cache_dir=cache)
+    online.canon("klv")
+    online.book_names("klv")
+    (cache / "translations.json").write_text("{corrupt", encoding="utf-8")
+    (cache / "books" / "klv.json").write_bytes(b"\xff\xfe")
+    shape = cache / "shape" / "klv.json"
+    record = json.loads(shape.read_text(encoding="utf-8"))
+    record["books"] = []
+    shape.write_text(json.dumps(record), encoding="utf-8")
+
+    offline = BibleApi("https://unreachable.test/v2", cache_dir=cache, offline=True)
+    with pytest.raises(BibleApiError, match="unreadable"):
+        offline.translations()
+    with pytest.raises(BibleApiError, match="unreadable"):
+        offline.book_names("klv")
+    with pytest.raises(BibleApiError, match="Offline"):
+        offline.canon("klv")
+    assert BibleApi(tree, cache_dir=cache).canon("klv")[1].chapter_count == 50
+
+
+def test_a_translation_with_an_absurd_verse_number_is_refused(tmp_path) -> None:
+    tree = write_bible_tree(tmp_path / "v2", {"klv": TRANSLATIONS["klv"]})
+    document = json.loads((tree / "klv.json").read_text(encoding="utf-8"))
+    document["books"][0]["chapters"][0]["verses"].append({"chapter": 1, "verse": 10**30})
+    payload = json.dumps(document).encode("utf-8")
+    (tree / "klv.json").write_bytes(payload)
+    (tree / "klv.sha").write_text(
+        hashlib.sha1(payload, usedforsecurity=False).hexdigest(), encoding="ascii"
+    )
+    with pytest.raises(BibleApiError, match="verse number"):
+        BibleApi(tree, cache_dir=tmp_path / "cache").canon("klv")

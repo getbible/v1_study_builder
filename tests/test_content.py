@@ -37,6 +37,7 @@ def test_text_is_normalised_to_one_space_and_trimmed_lines() -> None:
     assert normalize_text("ABEL.   1. Son of Adam\n \t* References\n\n\n\n 2. A stone \r\n") == (
         "ABEL. 1. Son of Adam\n* References\n\n2. A stone"
     )
+    assert normalize_text("a\u2003b\u3000c\x0cd") == "a b c d"
     assert public_content({"plain": "26.  ἀγάπη agape\n from 25"}) == {
         "text": "26. ἀγάπη agape\nfrom 25"
     }
@@ -107,3 +108,20 @@ def test_rendered_anchors_spell_every_family_the_same_way() -> None:
     # The same reference in both forms is listed once.
     raw = '<reference osisRef="Rom.5.8">Rom. 5:8</reference>'
     assert len(extract_markup_references(raw, html)) == 3
+
+
+def test_empty_reference_tags_comments_and_order_are_read_as_the_document_has_them() -> None:
+    raw = (
+        '<!-- <scripRef passage="Gen 9:9">x</scripRef> -->'
+        'the flood <a href="sword://Bible/Gen.7.1">here</a> then '
+        '<scripRef passage="Gen 1:1"/> and <scripRef passage="Exod 2:1">Exod 2:1</scripRef> '
+        '<a href="sword://Bible/John 3:16">John 3:16</a> '
+        '<scripRef passage="Gen 3:1">Gen<br/>3:1<note>n</note></scripRef>'
+    )
+    assert extract_markup_references(raw) == [
+        MarkupReference("osis", "Gen.7.1", "here"),
+        MarkupReference("passage", "Gen 1:1", ""),
+        MarkupReference("passage", "Exod 2:1", "Exod 2:1"),
+        MarkupReference("passage", "John 3:16", "John 3:16"),
+        MarkupReference("passage", "Gen 3:1", "Gen 3:1 [n]"),
+    ]

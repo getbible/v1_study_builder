@@ -1113,11 +1113,11 @@ class ReferenceEngine:
                     reference.value, book=context.book, chapter=context.chapter
                 )
             display = " ".join(reference.display.split())
-            position = text.find(display, cursor) if display else -1
-            if position >= 0:
+            located = _locate(text, display, cursor) if display else None
+            if located is not None:
                 # Whatever the markup cites, the text it covers is not prose: a
                 # citation the API cannot resolve must not be re-read as one it can.
-                end = position + len(display)
+                position, end = located
                 cursor = end
                 guards.append(
                     Guard(
@@ -1128,7 +1128,7 @@ class ReferenceEngine:
                     )
                 )
                 for item in items:
-                    found.append((position, order, {"text": display, **item}))
+                    found.append((position, order, {"text": text[position:end], **item}))
                     order += 1
             else:
                 for item in items:
@@ -1141,6 +1141,17 @@ class ReferenceEngine:
             order += 1
         found.sort(key=lambda entry: (entry[0], entry[1]))
         return _dedupe([item for _position, _order, item in found])
+
+
+def _locate(text: str, display: str, start: int) -> tuple[int, int] | None:
+    """Where the display text of a markup reference stands in the text, from ``start``.
+
+    The markup may break a citation across a line where the text does; the words are
+    matched with any white space between them.
+    """
+    pattern = r"\s+".join(re.escape(word) for word in display.split())
+    match = re.compile(pattern).search(text, start)
+    return (match.start(), match.end()) if match else None
 
 
 def _dedupe(items: Iterable[dict]) -> list[dict]:

@@ -222,6 +222,10 @@ def test_module_text_is_decoded_without_losing_characters() -> None:
     )
     assert decode_module_text(b"plain") == "plain"
     assert decode_module_text(b"\x81\x8d") == "\x81\x8d"
+    assert decode_module_text(b"\xef\xbb\xbfhi") == "hi"
+    assert decode_module_text("hi".encode("utf-16"), "UTF-16") == "hi"
+    with pytest.raises(ContractError, match="encoding"):
+        decode_module_text(b"hi", "SCSU")
 
 
 def test_a_declared_single_byte_encoding_decodes_the_whole_stream(

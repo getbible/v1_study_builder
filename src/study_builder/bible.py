@@ -42,6 +42,7 @@ _SHA1 = re.compile(r"^[0-9a-f]{40}$")
 _ABBREVIATION = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 MAX_BOOK_NUMBER = 200
 MAX_CHAPTERS = 300
+MAX_VERSES = 500
 
 
 class BibleApiError(RuntimeError):
@@ -191,8 +192,16 @@ class BibleApi:
             raise BibleApiError(f"Bible API published an invalid hash at {relative}")
         return value
 
-    def _cache_path(self, name: str) -> Path | None:
-        return self.cache_dir / name if self.cache_dir else None
+    def _cache_path(self, *parts: str) -> Path | None:
+        """A cache file; the catalogue, the shapes and the books indexes never share a name."""
+        return self.cache_dir.joinpath(*parts) if self.cache_dir else None
+
+    @staticmethod
+    def _cached_json(path: Path, what: str) -> Any:
+        try:
+            return read_json(path)
+        except (OSError, ValueError) as error:
+            raise BibleApiError(f"Cached Bible API {what} is unreadable: {path}") from error
 
     # -- catalogue ----------------------------------------------------------
 
@@ -205,7 +214,7 @@ class BibleApi:
                 raise BibleApiError(
                     "Offline mode requested but no cached Bible API translations catalogue exists"
                 )
-            data = read_json(cache)
+            data = self._cached_json(cache, "catalogue")
         else:
             data = self._read_json("translations.json")
             if cache is not None:
@@ -220,13 +229,13 @@ class BibleApi:
         if abbreviation in self._book_names:
             return self._book_names[abbreviation]
         abbreviation = _abbreviation(abbreviation)
-        cache = self._cache_path(f"{abbreviation}.books.json")
+        cache = self._cache_path("books", f"{abbreviation}.json")
         if self.offline:
             if cache is None or not cache.is_file():
                 raise BibleApiError(
                     f"Offline mode requested but no cached books index exists for {abbreviation}"
                 )
-            data = read_json(cache)
+            data = self._cached_json(cache, "books index")
         else:
             data = self._read_json(f"{abbreviation}/books.json")
             if cache is not None:
@@ -240,7 +249,7 @@ class BibleApi:
         if abbreviation in self._canons:
             return self._canons[abbreviation]
         abbreviation = _abbreviation(abbreviation)
-        cache = self._cache_path(f"{abbreviation}.json")
+        cache = self._cache_path("shape", f"{abbreviation}.json")
         cached = _read_canon_cache(cache, abbreviation)
         if self.offline:
             if cached is None:
@@ -267,9 +276,15 @@ class BibleApi:
     def _refresh(self, abbreviation: str, cached: dict[str, Any] | None) -> dict[str, Any]:
         translation = self.translations().get(abbreviation)
         remote_sha = self._read_sha(f"{abbreviation}.sha", f"{abbreviation}.json")
-        if cached is not None and cached.get("sha") == remote_sha:
-            return {**cached, "checked_at": utc_now()}
         names = self.book_names(abbreviation)
+        if (
+            cached is not None
+            and cached.get("sha") == remote_sha
+            and {int(b["number"]): str(b["name"]) for b in cached["books"]} == names
+        ):
+            # Unchanged, and still what the books index says; a books index that moved
+            # without the translation is read afresh below, and refused if they differ.
+            return {**cached, "checked_at": utc_now()}
         payload: bytes | None = None
         for _attempt in range(2):
             payload = self._read(f"{abbreviation}.json")
@@ -465,7 +480,10 @@ def _shape_of(document: Any, abbreviation: str) -> dict[int, dict[str, Any]]:
                     "has no verses array"
                 )
             numbers = [item.get("verse") if isinstance(item, dict) else None for item in verses]
-            if any(isinstance(n, bool) or not isinstance(n, int) or n < 1 for n in numbers):
+            if any(
+                isinstance(n, bool) or not isinstance(n, int) or not 1 <= n <= MAX_VERSES
+                for n in numbers
+            ):
                 raise BibleApiError(
                     f"Bible API translation {abbreviation} book {number} chapter {index} "
                     "has an invalid verse number"
@@ -495,11 +513,25 @@ def _read_canon_cache(path: Path | None, abbreviation: str) -> dict[str, Any] | 
         or not isinstance(record.get("books"), list)
     ):
         return None
+    if not record["books"]:
+        return None
     try:
         for item in record["books"]:
             _book_number(item["number"], "cached Bible shape")
-            if not str(item["name"]) or not all(
-                isinstance(count, int) and count >= 0 for count in item["verses"]
+            name = item["name"]
+            counts = item["verses"]
+            if (
+                not isinstance(name, str)
+                or not name.strip()
+                or not isinstance(counts, list)
+                or not counts
+                or len(counts) > MAX_CHAPTERS
+                or not all(
+                    isinstance(count, int)
+                    and not isinstance(count, bool)
+                    and 0 <= count <= MAX_VERSES
+                    for count in counts
+                )
             ):
                 return None
     except (KeyError, TypeError):

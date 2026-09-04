@@ -114,22 +114,29 @@ def _cp1252_fallback(error: UnicodeError) -> tuple[str, int]:
 codecs.register_error("study-builder-cp1252", _cp1252_fallback)
 
 _SINGLE_BYTE_ENCODINGS = {"latin-1", "latin1", "iso-8859-1", "iso8859-1", "cp1252", "windows-1252"}
+_UTF8_ENCODINGS = {"", "utf-8", "utf8"}
+_UTF16_ENCODINGS = {"utf-16", "utf16"}
 
 
 def decode_module_text(payload: bytes, encoding: str = "") -> str:
     """Decode module bytes as the module declares them, and never lose a character.
 
     A module declaring a single-byte encoding is read as Windows-1252, the superset of
-    Latin-1 its files actually use. Anything else is UTF-8, with a byte UTF-8 cannot
-    read taken as Windows-1252 rather than replaced.
+    Latin-1 its files actually use. UTF-8, declared or not, is read with a byte UTF-8
+    cannot read taken as Windows-1252 rather than replaced, and a byte-order mark is
+    not a character of the text. An encoding the builder does not read stops the build.
     """
     declared = encoding.strip().casefold().replace("_", "-")
     if declared in _SINGLE_BYTE_ENCODINGS:
         return payload.decode("cp1252", errors="study-builder-cp1252")
+    if declared in _UTF16_ENCODINGS:
+        return payload.decode("utf-16").lstrip("\ufeff")
+    if declared not in _UTF8_ENCODINGS:
+        raise ContractError(f"Unsupported module encoding: {encoding!r}")
     try:
-        return payload.decode("utf-8")
+        return payload.decode("utf-8-sig")
     except UnicodeDecodeError:
-        return payload.decode("utf-8", errors="study-builder-cp1252")
+        return payload.decode("utf-8-sig", errors="study-builder-cp1252")
 
 
 def _text(value: Any, context: str, encoding: str = "") -> str:
