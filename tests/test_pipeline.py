@@ -10,7 +10,7 @@ from study_builder.pipeline import (
 
 
 @pytest.fixture
-def pipeline(tmp_path, project_root) -> BuildPipeline:
+def pipeline(tmp_path, project_root, bible_tree) -> BuildPipeline:
     return BuildPipeline(
         PipelineConfig(
             root=project_root,
@@ -21,6 +21,8 @@ def pipeline(tmp_path, project_root) -> BuildPipeline:
             schemas_dir=project_root / "schemas",
             engine_manifest_path=project_root / "conf/getbiblesword.json",
             engine_schema_path=project_root / "schemas/getbiblesword-ndjson-v1.schema.json",
+            aliases_dir=project_root / "conf/book_aliases",
+            bible_api=str(bible_tree),
         )
     )
 

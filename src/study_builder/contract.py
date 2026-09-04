@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import codecs
 import hashlib
 import hmac
 import json
@@ -91,8 +92,48 @@ def _validate_byte_values(value: Any, context: str) -> None:
             _validate_byte_values(child, f"{context}[{index}]")
 
 
-def _text(value: Any, context: str) -> str:
-    return decode_byte_value(value, context).decode("utf-8", errors="replace")
+def _cp1252_fallback(error: UnicodeError) -> tuple[str, int]:
+    """Read a byte UTF-8 cannot as Windows-1252, the encoding of the modules it occurs in.
+
+    The dictionaries that carry such bytes write ``’`` as 0x92 and a non-breaking space as
+    0xA0. Replacing them with U+FFFD lost the apostrophe of "David’s" and the space of
+    "1 Chronicles" in thousands of entries; reading them as Windows-1252 keeps both. A
+    byte Windows-1252 leaves undefined is read as Latin-1, so nothing is dropped.
+    """
+    if not isinstance(error, UnicodeDecodeError):
+        raise error
+    decoded = []
+    for byte in error.object[error.start : error.end]:
+        try:
+            decoded.append(bytes([byte]).decode("cp1252"))
+        except UnicodeDecodeError:
+            decoded.append(chr(byte))
+    return "".join(decoded), error.end
+
+
+codecs.register_error("study-builder-cp1252", _cp1252_fallback)
+
+_SINGLE_BYTE_ENCODINGS = {"latin-1", "latin1", "iso-8859-1", "iso8859-1", "cp1252", "windows-1252"}
+
+
+def decode_module_text(payload: bytes, encoding: str = "") -> str:
+    """Decode module bytes as the module declares them, and never lose a character.
+
+    A module declaring a single-byte encoding is read as Windows-1252, the superset of
+    Latin-1 its files actually use. Anything else is UTF-8, with a byte UTF-8 cannot
+    read taken as Windows-1252 rather than replaced.
+    """
+    declared = encoding.strip().casefold().replace("_", "-")
+    if declared in _SINGLE_BYTE_ENCODINGS:
+        return payload.decode("cp1252", errors="study-builder-cp1252")
+    try:
+        return payload.decode("utf-8")
+    except UnicodeDecodeError:
+        return payload.decode("utf-8", errors="study-builder-cp1252")
+
+
+def _text(value: Any, context: str, encoding: str = "") -> str:
+    return decode_module_text(decode_byte_value(value, context), encoding)
 
 
 class GetBibleSwordContractReader:
@@ -208,7 +249,8 @@ class GetBibleSwordContractReader:
                     )
                 if record.get("ordinal") != len(entries):
                     raise ContractError("getbiblesword entry ordinals are not monotonic")
-                entries.append(self._adapt_entry(record, sequence))
+                encoding = configuration.get("encoding", [""])[-1]
+                entries.append(self._adapt_entry(record, sequence, encoding))
             elif record_type == "artifact_begin":
                 artifact_phase = True
                 artifact_id = record.get("artifact_id")
@@ -314,9 +356,9 @@ class GetBibleSwordContractReader:
         return metadata
 
     @staticmethod
-    def _adapt_entry(record: dict[str, Any], sequence: int) -> dict[str, Any]:
-        key = _text(record["key"], f"record[{sequence}].key")
-        raw = _text(record["raw"], f"record[{sequence}].raw")
+    def _adapt_entry(record: dict[str, Any], sequence: int, encoding: str = "") -> dict[str, Any]:
+        key = _text(record["key"], f"record[{sequence}].key", encoding)
+        raw = _text(record["raw"], f"record[{sequence}].raw", encoding)
         rendered = record.get("rendered_default")
         stripped = record.get("stripped")
         scope = record.get("scope") or {}
@@ -335,12 +377,14 @@ class GetBibleSwordContractReader:
             "key": key,
             "raw": raw,
             "html": (
-                _text(rendered, f"record[{sequence}].rendered_default")
+                _text(rendered, f"record[{sequence}].rendered_default", encoding)
                 if rendered is not None
                 else ""
             ),
             "plain": (
-                _text(stripped, f"record[{sequence}].stripped") if stripped is not None else ""
+                _text(stripped, f"record[{sequence}].stripped", encoding)
+                if stripped is not None
+                else ""
             ),
             "verse": verse,
             "_getbiblesword": record,

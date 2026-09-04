@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from study_builder import __version__
+from study_builder.bible import DEFAULT_BIBLE_API, BibleApi
 from study_builder.books import BookRegistry
 from study_builder.catalog import CATALOG_URL, load_catalog, select_modules
 from study_builder.commentaries import CommentaryWriter
@@ -18,6 +19,7 @@ from study_builder.models import BuildReport, ModuleDescriptor, ResourceKind
 from study_builder.modules import ModuleInstaller
 from study_builder.native import SwordExporter
 from study_builder.policy import ModulePolicy
+from study_builder.references import ReferenceEngine
 from study_builder.util import (
     DOCUMENT_CEILING_BYTES,
     hash_tree,
@@ -66,6 +68,8 @@ class PipelineConfig:
     schemas_dir: Path
     engine_manifest_path: Path
     engine_schema_path: Path
+    aliases_dir: Path | None = None
+    bible_api: str = DEFAULT_BIBLE_API
     engine_path: Path | None = None
     resource: str = "all"
     modules: frozenset[str] = frozenset()
@@ -89,6 +93,19 @@ class BuildPipeline:
         self.books = BookRegistry(config.books_path)
         self.engine = GetBibleSwordManager(
             config.engine_manifest_path, config.work_dir, http=self.http
+        )
+        self.bible = BibleApi(
+            config.bible_api,
+            cache_dir=config.work_dir / "bible",
+            http=self.http,
+            offline=config.offline,
+        )
+
+    def references_for(self, module: ModuleDescriptor, metadata: dict[str, Any]) -> ReferenceEngine:
+        """The reference engine for one module: the Bible in its versification and language."""
+        versification = module.first("versification") or str(metadata.get("versification") or "")
+        return ReferenceEngine.for_module(
+            self.bible, self.books, module.language, versification, self.config.aliases_dir
         )
 
     def _catalog(self) -> list[ModuleDescriptor]:
@@ -201,12 +218,14 @@ class BuildPipeline:
                         }
                         for item in exported.diagnostics
                     ]
+                references = self.references_for(module, exported.metadata)
                 writer = (
                     CommentaryWriter(
                         generated_roots[kind],
                         self.books,
                         self.config.schemas_dir,
                         self.config.max_document_bytes,
+                        references=references,
                     )
                     if kind == "commentaries"
                     else DictionaryWriter(
@@ -214,6 +233,7 @@ class BuildPipeline:
                         self.books,
                         self.config.schemas_dir,
                         self.config.max_document_bytes,
+                        references=references,
                     )
                 )
                 record, metadata = writer.write(module, exported)
@@ -268,6 +288,7 @@ class BuildPipeline:
                     "resource": kind,
                     "generated_at": generated_at,
                     "catalog_url": CATALOG_URL,
+                    "bible_api": self.config.bible_api,
                     "module_count": len(records),
                 },
             )

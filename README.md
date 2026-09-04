@@ -21,12 +21,16 @@ application never has to sanitize a response before rendering it.
 | --- | --- | --- |
 | `getbible/getbiblesword` | Official SWORD C++ extraction and deterministic NDJSON | Released Linux executable |
 | `getbible/v1_study_builder` | Download policy, strict contract validation, normalization, schemas, and publication | Python 3.12 at build time |
+| `getbible/librarian` (`getbible` on PyPI) | Scripture reference engine: book-name tables and parser behind `query.getbible.net` | Python library at build time |
+| `api.getbible.net/v2` | The Bible itself: which books, chapters, and verses each translation has, and what a language calls the books | Read at build time, cached |
 | `getbible/commentaries` | Generated commentary JSON under `v1/` | Nginx/CDN only |
 | `getbible/dictionaries` | Generated dictionary JSON under `v1/` | Nginx/CDN only |
 
 Study Builder does not contain C++, link `libsword`, use a Python SWORD binding, or
 parse a module's binary driver format. `getbiblesword` is a separately versioned
-subprocess dependency.
+subprocess dependency. Nor does it carry its own idea of the Bible: the shape of the
+books and the spellings of their names come from the Bible API and the librarian, the
+same sources every other GetBible service reads.
 
 ## Extraction dependency
 
@@ -54,6 +58,32 @@ study-builder engine verify
 
 An audited local executable can be selected with `--engine /absolute/path` or
 `STUDY_BUILDER_GETBIBLESWORD`; it must still report the pinned version and contract.
+
+## Bible API dependency
+
+Every scripture reference the builder publishes is a coordinate in the Bible API, so
+whether a coordinate exists is decided by the API, not by a table in this repository.
+Before a module is written, the builder reads from `https://api.getbible.net/v2`:
+
+1. `translations.json`, to know each translation's language and versification;
+2. `{translation}/books.json`, for the numbered book names of the translations it uses;
+3. `{translation}.json` and `{translation}.sha`, once per translation, from which it keeps
+   only how many chapters each book has and how many verses each chapter has.
+
+No scripture text is published or kept. The shape is cached under `.work/bible/` with
+the hash it was downloaded under, and on every online build the hash is read again and
+the shape refreshed when it changed, which is what the API's cache policy asks of every
+consumer. `--offline` uses the cache alone.
+
+A module is matched to translations by its `Versification` (`KJV` when it states none):
+the best translation in that versification, preferably in the module's language, plus its
+Apocrypha variant (`kjva` beside `kjv`) so deuterocanonical citations resolve. Book names
+for the published `ref` come from a translation in the module's own language, so a
+Swedish module cites `Andra Moseboken 30:34` and a Vietnamese one `Ma-thi-ơ 24:12`. Each
+module's `metadata.json` records the choice under `references`.
+
+`--bible-api` (or `STUDY_BUILDER_BIBLE_API`) points the builder at another API root, or at
+a directory with the same layout; the tests run against such a directory.
 
 ## Independent contract validation
 
@@ -121,7 +151,7 @@ byte-for-byte. One client parser therefore handles all three:
       "verse": 1,
       "osis": "John.1.1",
       "text": "...",
-      "references": [{"osis": "Gen.1.1", "book": 1, "chapter": 1, "verse": 1}]
+      "references": [{"ref": "Genesis 1:1", "osis": "Gen.1.1", "book": 1, "chapter": 1, "verse": 1}]
     }
   ]
 }
@@ -244,7 +274,7 @@ navigate in either direction without rebuilding an index:
   "text": "Holy; a place in the wilderness of Zin.",
   "see_also": [{"id": "k-MERIBAH", "key": "MERIBAH"}],
   "backlinks": [{"id": "k-ZIN", "key": "ZIN"}],
-  "references": [{"osis": "Num.20.1", "book": 4, "chapter": 20, "verse": 1}]
+  "references": [{"ref": "Numbers 20:1", "osis": "Num.20.1", "book": 4, "chapter": 20, "verse": 1}]
 }
 ```
 
@@ -265,59 +295,82 @@ value. Dictionary metadata reports both the total `entry_count` and the distinct
 `{dictionary}.json` is the complete dictionary in index order, for offline
 clients that would otherwise request every word individually.
 
+## Plain text
+
+Every document is plain text, and the text is laid out the way the module laid it out.
+SWORD's own plain-text reading of a ThML module collapses every line and paragraph
+break, so Torrey's lists and Smith's paragraphs would arrive as one unbroken line; for
+ThML modules the builder reads the source markup itself, keeping SWORD's conventions
+(entities, `<G3056>` Strong's markers, `[bracketed]` notes) and keeping the breaks. The
+other markup families keep their breaks in SWORD's reading already. Whatever the family,
+the published text has one space between words, no leading or trailing space on a line,
+and at most one blank line between blocks.
+
+Bytes the module wrote in Windows-1252 — the `’` of "David’s", the non-breaking space of
+"1 Chronicles" — are read as such rather than replaced with `�`.
+
 ## Scripture references
 
 Every entry that cites scripture carries `references`, in the same shape in both
-APIs. `book`, `chapter`, and `verse` are Bible API v3 coordinates, so a client can
-move from a word or a comment to the verse with a direct lookup, and build the
-reverse index from a verse to every entry that cites it:
+APIs. `book`, `chapter`, and `verse` are Bible API coordinates, so a client can move
+from a word or a comment to the verse with a direct lookup, and build the reverse index
+from a verse to every entry that cites it. `ref` is the same reference written
+canonically, in the form the Query API accepts:
 
-```json
-{"osis": "Num.20.1", "book": 4, "chapter": 20, "verse": 1}
+```text
+https://query.getbible.net/v2/kjv/Numbers 20:1
 ```
 
-Where the source module marks its references up, they are published from that
-markup. Many dictionaries — Thompson Chain, Torrey, Nave, Smith, the American
-Tract Society dictionary — and some commentaries carry them only in the prose:
+Where the source module marks its references up — an OSIS `osisRef`, a TEI `ref`, a
+ThML `scripRef` passage, a `sword://Bible/` link — the markup decides what the text it
+covers cites. Many dictionaries (Thompson Chain, Torrey, Smith, the American Tract
+Society dictionary) and some commentaries carry citations only in the prose:
 
 ```text
 son of Adam, slain by Cain Ge 4:2,8; Mt 23:35; Heb 11:4; 12:24
 ```
 
-The text is published exactly as the source wrote it. The citations are recognised
-in it and published beside it, in the order the text cites them:
+The text is published exactly as the source wrote it. The citations are recognised in
+it and published beside it, in the order the text cites them:
 
 ```json
 "references": [
-  {"text": "Ge 4:2,8", "ref": "Ge 4:2,8", "osis": "Gen.4.2", "book": 1, "chapter": 4, "verse": 2, "verses": [2, 8]},
-  {"text": "Mt 23:35", "ref": "Mt 23:35", "osis": "Matt.23.35", "book": 40, "chapter": 23, "verse": 35},
-  {"text": "Heb 11:4", "ref": "Heb 11:4", "osis": "Heb.11.4", "book": 58, "chapter": 11, "verse": 4},
-  {"text": "12:24", "ref": "Heb 12:24", "osis": "Heb.12.24", "book": 58, "chapter": 12, "verse": 24}
+  {"text": "Ge 4:2,8", "ref": "Genesis 4:2,8", "osis": "Gen.4.2", "book": 1, "chapter": 4, "verse": 2, "verses": [2, 8]},
+  {"text": "Mt 23:35", "ref": "Matthew 23:35", "osis": "Matt.23.35", "book": 40, "chapter": 23, "verse": 35},
+  {"text": "Heb 11:4", "ref": "Hebrews 11:4", "osis": "Heb.11.4", "book": 58, "chapter": 11, "verse": 4},
+  {"text": "12:24", "ref": "Hebrews 12:24", "osis": "Heb.12.24", "book": 58, "chapter": 12, "verse": 24}
 ]
 ```
 
 `text` is the citation exactly as it appears in the entry's `text`, so a client can
-find it there and link it. `ref` is the same citation with the book name restored:
-a citation that names no book — `12:24`, or `In 9:46 he is called` — belongs to the
-book named most recently in the text, and `ver. 7` to the chapter cited most
-recently. A comment in a commentary belongs to its own book and chapter until it
-names another. Both members are present only on references recognised in the
-text; references taken from source markup carry the coordinates alone.
+find it there and link it; it is present whenever the citation was located in the text,
+whether the markup or the prose supplied it. A citation that names no book — `12:24`,
+or `In 9:46 he is called` — belongs to the book named most recently in the text, and
+`ver. 7` to the chapter cited most recently. A comment in a commentary belongs to its own
+book and chapter until it names another.
 
 Resolving a reference is the rule commentary entries already use: **it covers
 `verses` when that member is present, `verse` alone when it is not, and the whole
 chapter when there is no `verse` at all.** `Ge 21:9-14` lists six verses, `Ex 28`
 names a chapter, and `Mt 5-7` is three chapter items. A range that crosses a chapter
-boundary, `Nu 16:1-17:13`, is published once per chapter it covers, with the KJV
-verse counts in `conf/book_registry.json` deciding where chapter 16 ends.
+boundary, `Nu 16:1-17:13`, is published once per chapter it covers, with the API's verse
+counts deciding where chapter 16 ends.
 
-Book names are recognised in the spellings `conf/book_registry.json` lists for the
-module's language: Online Bible abbreviations (`Ge`, `Joh`, `1 Sa`), dotted and full
-names (`Gen.`, `1 Chr.`, `Genesis`), roman ordinals (`II Co`), and the Swedish and
-Vietnamese sets the current modules use. A module in a language without a table
-publishes only its marked-up references. Citations of other works — `Ant. 11:8`,
-`Enoch 6:6` — are left alone, and a chapter the book does not have is not published,
-so a stray `1 Ki 30:1` cannot resolve to anything.
+Recognising a book name is the librarian's job. Its per-translation tables and
+Unicode-normalising trie — the engine behind `query.getbible.net` — resolve `1Sa`,
+`Första Moseboken` or `Ma-thi-ơ`, and every published `ref` is read back through it, so
+a `ref` is by construction a reference the Query API resolves. `conf/book_aliases/`
+adds, in the librarian's own table format, the spellings the current modules use that
+its tables lack (Online Bible's `Lu`, `Joe`, `Jud`; Smith's `Isai`, `Psal`), ready to be
+contributed upstream; adding a spelling or a language is a data change. A module in a
+language with no table is read with the names its translation publishes and the
+spellings of the translation that gives it its shape.
+
+Citations of other works — `Ant. 11:8`, `Enoch 6:6`, `Sib Or 3:271` — are left alone, as
+are times of day, ratios, page numbers, numbered headwords (`PHILIP (1)`) and topic
+cross-references (`See HEBREWS 2.`). A chapter the book does not have, or a verse the
+chapter does not have, is not published: the API has nothing at that address, so `1 Ki
+30:1` and `Genesis 50:36` resolve to nothing.
 
 ## Integrity and schemas
 
@@ -405,8 +458,8 @@ publication run is:
 study-builder build --resource all --pull --push
 ```
 
-Use `--offline` only after catalog and package caches exist. Use `--dry-run` to
-show approved work without downloading packages or installing the extractor.
+Use `--offline` only after catalog, package, and Bible API caches exist. Use `--dry-run`
+to show approved work without downloading packages or installing the extractor.
 
 ## Automation
 

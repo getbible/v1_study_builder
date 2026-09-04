@@ -52,8 +52,8 @@
       "type": "array",
       "items": {
         "type": "object",
-        "description": "One scripture reference. book, chapter, and verse are Bible API v3 coordinates; verses lists every verse covered when there is more than one, and an item without verse covers the whole chapter. text and ref are present when the reference was recognised in the plain text rather than in the source markup: text is the citation exactly as it appears in the entry text, and ref is the same citation with the book name restored where the source left it implicit.",
-        "required": ["osis", "book", "chapter"],
+        "description": "One scripture reference, resolved against the GetBible Bible API. book, chapter, and verse are Bible API coordinates; verses lists every verse covered when there is more than one, and an item without verse covers the whole chapter. ref is the same reference written canonically, in the book name the module's language uses, in the form the Query API accepts. text is present when the citation was located in the entry text: the citation exactly as the text spells it.",
+        "required": ["ref", "osis", "book", "chapter"],
         "properties": {
           "text": {"type": "string", "minLength": 1},
           "ref": {"type": "string", "minLength": 1},

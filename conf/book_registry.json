@@ -1,724 +1,86 @@
 [
-  {
-    "number": 1, "name": "Genesis", "osis": ["Gen"],
-    "verses": [31, 25, 24, 26, 32, 22, 24, 22, 29, 32, 32, 20, 18, 24, 21, 16, 27, 33, 38, 18, 34, 24, 20, 67, 34, 35, 46, 22, 35, 43, 55, 32, 20, 31, 29, 43, 36, 30, 23, 23, 57, 38, 34, 34, 28, 34, 31, 22, 33, 26],
-    "names": {
-      "en": ["Genesis", "Gen", "Ge", "Gn"],
-      "sv": ["1 Mos"],
-      "vi": ["Sáng", "STK", "Stk", "Ge"]
-    }
-  },
-  {
-    "number": 2, "name": "Exodus", "osis": ["Exod"],
-    "verses": [22, 25, 22, 31, 23, 30, 25, 32, 35, 29, 10, 51, 22, 31, 27, 36, 16, 27, 25, 26, 36, 31, 33, 18, 40, 37, 21, 43, 46, 38, 18, 35, 23, 35, 35, 38, 29, 31, 43, 38],
-    "names": {
-      "en": ["Exodus", "Exod", "Exo", "Ex"],
-      "sv": ["2 Mos"],
-      "vi": ["Xuất"]
-    }
-  },
-  {
-    "number": 3, "name": "Leviticus", "osis": ["Lev"],
-    "verses": [17, 16, 17, 35, 19, 30, 38, 36, 24, 20, 47, 8, 59, 57, 33, 34, 16, 30, 37, 27, 24, 33, 44, 23, 55, 46, 34],
-    "names": {
-      "en": ["Leviticus", "Levit", "Lev", "Le", "Lv", "Levi"],
-      "sv": ["3 Mos"],
-      "vi": ["Lê"]
-    }
-  },
-  {
-    "number": 4, "name": "Numbers", "osis": ["Num"],
-    "verses": [54, 34, 51, 49, 31, 27, 89, 26, 23, 36, 35, 16, 33, 45, 41, 50, 13, 32, 22, 29, 35, 41, 30, 25, 18, 65, 23, 31, 40, 16, 54, 42, 56, 29, 34, 13],
-    "names": {
-      "en": ["Numbers", "Numb", "Num", "Nu", "Nm", "Nb"],
-      "sv": ["4 Mos"],
-      "vi": ["Dân"]
-    }
-  },
-  {
-    "number": 5, "name": "Deuteronomy", "osis": ["Deut"],
-    "verses": [46, 37, 29, 49, 33, 25, 26, 20, 29, 22, 32, 32, 18, 29, 23, 22, 20, 22, 21, 20, 23, 30, 25, 22, 19, 19, 26, 68, 29, 20, 30, 52, 29, 12],
-    "names": {
-      "en": ["Deuteronomy", "Deuter", "Deut", "Deu", "De", "Dt"],
-      "sv": ["5 Mos"],
-      "vi": ["Phục"]
-    }
-  },
-  {
-    "number": 6, "name": "Joshua", "osis": ["Josh"],
-    "verses": [18, 24, 17, 24, 15, 27, 26, 35, 27, 43, 23, 24, 33, 15, 63, 10, 18, 28, 51, 9, 45, 34, 16, 33],
-    "names": {
-      "en": ["Joshua", "Josh", "Jos", "Jsh"],
-      "sv": ["Jos"],
-      "vi": ["Giô-suê"]
-    }
-  },
-  {
-    "number": 7, "name": "Judges", "osis": ["Judg"],
-    "verses": [36, 23, 31, 24, 31, 40, 25, 35, 57, 18, 40, 15, 25, 20, 20, 31, 13, 31, 30, 48, 25],
-    "names": {
-      "en": ["Judges", "Judge", "Judg", "Jud", "Jdgs", "Jdg", "Jgs", "Jg"],
-      "sv": ["Dom"],
-      "vi": ["Các Quan Xét"]
-    }
-  },
-  {
-    "number": 8, "name": "Ruth", "osis": ["Ruth"],
-    "verses": [22, 23, 18, 22],
-    "names": {
-      "en": ["Ruth", "Rut", "Rth", "Ru"],
-      "sv": ["Rut"],
-      "vi": ["Ru-tơ"]
-    }
-  },
-  {
-    "number": 9, "name": "I Samuel", "osis": ["1Sam"],
-    "verses": [28, 36, 21, 22, 12, 21, 17, 22, 27, 27, 15, 25, 23, 52, 35, 23, 58, 30, 24, 42, 15, 23, 29, 22, 44, 25, 12, 25, 11, 31, 13],
-    "names": {
-      "en": ["1 Samuel", "1 Sam", "1 Sa", "1 Sm", "1 S", "1 Kingdoms", "1 Kgdms", "1 Kgdm", "1 Kingdom"],
-      "sv": ["1 Sam"],
-      "vi": ["1 Sa"]
-    }
-  },
-  {
-    "number": 10, "name": "II Samuel", "osis": ["2Sam"],
-    "verses": [27, 32, 39, 12, 25, 23, 29, 18, 13, 19, 27, 31, 39, 33, 37, 23, 29, 33, 43, 26, 22, 51, 39, 25],
-    "names": {
-      "en": ["2 Samuel", "2 Sam", "2 Sa", "2 Sm", "2 S", "2 Kingdoms", "2 Kgdms", "2 Kgdm", "2 Kingdom"],
-      "sv": ["2 Sam"],
-      "vi": ["2 Sa"]
-    }
-  },
-  {
-    "number": 11, "name": "I Kings", "osis": ["1Kgs"],
-    "verses": [53, 46, 28, 34, 18, 38, 51, 66, 28, 29, 43, 33, 34, 31, 34, 34, 24, 46, 21, 43, 29, 53],
-    "names": {
-      "en": ["1 Kings", "1 King", "1 Kgs", "1 Kin", "1 Ki", "1 K", "3 Kings", "3 King", "3 Kgs", "3 Kin", "3 Ki", "3 K", "3 Kingdoms", "3 Kgdms", "3 Kgdm", "3 Kingdom"],
-      "sv": ["1 Kon"],
-      "vi": ["1 Các Vua"]
-    }
-  },
-  {
-    "number": 12, "name": "II Kings", "osis": ["2Kgs"],
-    "verses": [18, 25, 27, 44, 27, 33, 20, 29, 37, 36, 21, 21, 25, 29, 38, 20, 41, 37, 37, 21, 26, 20, 37, 20, 30],
-    "names": {
-      "en": ["2 Kings", "2 King", "2 Kgs", "2 Kin", "2 Ki", "2 K", "4 Kings", "4 King", "4 Kgs", "4 Kin", "4 Ki", "4 K", "4 Kingdoms", "4 Kgdms", "4 Kgdm", "4 Kingdom"],
-      "sv": ["2 Kon"],
-      "vi": ["2 Các Vua"]
-    }
-  },
-  {
-    "number": 13, "name": "I Chronicles", "osis": ["1Chr"],
-    "verses": [54, 55, 24, 43, 26, 81, 40, 40, 44, 14, 47, 40, 14, 17, 29, 43, 27, 17, 19, 8, 30, 19, 32, 31, 31, 32, 34, 21, 30],
-    "names": {
-      "en": ["1 Chronicles", "1 Chronicals", "1 Chron", "1 Chr", "1 Ch", "1 Paralipomenon", "1 Par"],
-      "sv": ["1 Krön"],
-      "vi": ["1 Sử"]
-    }
-  },
-  {
-    "number": 14, "name": "II Chronicles", "osis": ["2Chr"],
-    "verses": [17, 18, 17, 22, 14, 42, 22, 18, 31, 19, 23, 16, 22, 15, 19, 14, 19, 34, 11, 37, 20, 12, 21, 27, 28, 23, 9, 27, 36, 27, 21, 33, 25, 33, 27, 23],
-    "names": {
-      "en": ["2 Chronicles", "2 Chronicals", "2 Chron", "2 Chr", "2 Ch", "2 Paralipomenon", "2 Par"],
-      "sv": ["2 Krön"],
-      "vi": ["2 Sử"]
-    }
-  },
-  {
-    "number": 15, "name": "Ezra", "osis": ["Ezra"],
-    "verses": [11, 70, 13, 24, 17, 22, 28, 36, 15, 44],
-    "names": {
-      "en": ["Ezra", "Ezr"],
-      "sv": ["Esra", "Esr"],
-      "vi": ["E-xơ-ra"]
-    }
-  },
-  {
-    "number": 16, "name": "Nehemiah", "osis": ["Neh"],
-    "verses": [11, 20, 32, 23, 19, 19, 73, 18, 38, 39, 36, 47, 31],
-    "names": {
-      "en": ["Nehemiah", "Nehem", "Nehe", "Neh", "Ne", "Neb"],
-      "sv": ["Neh"],
-      "vi": ["Nê"]
-    }
-  },
-  {
-    "number": 17, "name": "Esther", "osis": ["Esth"],
-    "verses": [22, 23, 15, 17, 14, 14, 10, 17, 32, 3],
-    "names": {
-      "en": ["Esther", "Esth", "Est", "Es"],
-      "sv": ["Est"],
-      "vi": ["Ê-xơ-tê"]
-    }
-  },
-  {
-    "number": 18, "name": "Job", "osis": ["Job"],
-    "verses": [22, 13, 26, 21, 27, 30, 21, 22, 35, 22, 20, 25, 28, 22, 35, 22, 16, 21, 29, 29, 34, 30, 17, 25, 6, 14, 23, 28, 25, 31, 40, 22, 33, 37, 16, 33, 24, 41, 30, 24, 34, 17],
-    "names": {
-      "en": ["Job", "Jb"],
-      "sv": ["Job"],
-      "vi": ["Gióp"]
-    }
-  },
-  {
-    "number": 19, "name": "Psalms", "osis": ["Ps"],
-    "verses": [6, 12, 8, 8, 12, 10, 17, 9, 20, 18, 7, 8, 6, 7, 5, 11, 15, 50, 14, 9, 13, 31, 6, 10, 22, 12, 14, 9, 11, 12, 24, 11, 22, 22, 28, 12, 40, 22, 13, 17, 13, 11, 5, 26, 17, 11, 9, 14, 20, 23, 19, 9, 6, 7, 23, 13, 11, 11, 17, 12, 8, 12, 11, 10, 13, 20, 7, 35, 36, 5, 24, 20, 28, 23, 10, 12, 20, 72, 13, 19, 16, 8, 18, 12, 13, 17, 7, 18, 52, 17, 16, 15, 5, 23, 11, 13, 12, 9, 9, 5, 8, 28, 22, 35, 45, 48, 43, 13, 31, 7, 10, 10, 9, 8, 18, 19, 2, 29, 176, 7, 8, 9, 4, 8, 5, 6, 5, 6, 8, 8, 3, 18, 3, 3, 21, 26, 9, 8, 24, 13, 10, 7, 12, 15, 21, 10, 20, 14, 9, 6],
-    "names": {
-      "en": ["Psalms", "Psalm", "Pss", "Psal", "Psa", "Ps", "Psm", "Pslm"],
-      "sv": ["Ps"],
-      "vi": ["Thi", "Tt"]
-    }
-  },
-  {
-    "number": 20, "name": "Proverbs", "osis": ["Prov"],
-    "verses": [33, 22, 35, 27, 23, 35, 27, 36, 18, 32, 31, 28, 25, 35, 33, 33, 28, 24, 29, 30, 31, 29, 35, 34, 28, 28, 27, 28, 27, 33, 31],
-    "names": {
-      "en": ["Proverbs", "Prov", "Pro", "Prv", "Pr"],
-      "sv": ["Ords"],
-      "vi": ["Châm"]
-    }
-  },
-  {
-    "number": 21, "name": "Ecclesiastes", "osis": ["Eccl"],
-    "verses": [18, 26, 22, 16, 20, 12, 29, 17, 18, 20, 10, 14],
-    "names": {
-      "en": ["Ecclesiastes", "Eccles", "Eccle", "Eccl", "Ecc", "Ec", "Qoheleth", "Qoh"],
-      "sv": ["Pred"],
-      "vi": ["Truyền"]
-    }
-  },
-  {
-    "number": 22, "name": "Song of Solomon", "osis": ["Song"],
-    "verses": [17, 17, 11, 16, 16, 13, 13, 14],
-    "names": {
-      "en": ["Song of Solomon", "Song of Songs", "Song of Sol", "Canticles", "Canticle", "Cant", "Ca", "Song", "So", "SoS", "Sos", "Solomon"],
-      "sv": ["Höga V", "HV", "Höga Visan"],
-      "vi": ["Nhã"]
-    }
-  },
-  {
-    "number": 23, "name": "Isaiah", "osis": ["Isa"],
-    "verses": [31, 22, 26, 6, 30, 13, 25, 22, 21, 34, 16, 6, 22, 32, 9, 14, 14, 7, 25, 6, 17, 25, 18, 23, 12, 21, 13, 29, 24, 33, 9, 20, 24, 17, 10, 22, 38, 22, 8, 31, 29, 25, 28, 28, 25, 13, 15, 22, 26, 11, 23, 15, 12, 17, 13, 12, 21, 14, 21, 22, 11, 12, 19, 12, 25, 24],
-    "names": {
-      "en": ["Isaiah", "Isai", "Isa", "Is"],
-      "sv": ["Jes"],
-      "vi": ["Ê-sai", "Ês"]
-    }
-  },
-  {
-    "number": 24, "name": "Jeremiah", "osis": ["Jer"],
-    "verses": [19, 37, 25, 31, 31, 30, 34, 22, 26, 25, 23, 17, 27, 22, 21, 21, 27, 23, 15, 18, 14, 30, 40, 10, 38, 24, 22, 17, 32, 24, 40, 44, 26, 22, 19, 32, 21, 28, 18, 16, 18, 22, 13, 30, 5, 28, 7, 47, 39, 46, 64, 34],
-    "names": {
-      "en": ["Jeremiah", "Jerem", "Jere", "Jer", "Je", "Jr"],
-      "sv": ["Jer"],
-      "vi": ["Giê"]
-    }
-  },
-  {
-    "number": 25, "name": "Lamentations", "osis": ["Lam"],
-    "verses": [22, 22, 66, 22, 22],
-    "names": {
-      "en": ["Lamentations", "Lament", "Lam", "La", "Lm"],
-      "sv": ["Klag"],
-      "vi": ["Ca Thương"]
-    }
-  },
-  {
-    "number": 26, "name": "Ezekiel", "osis": ["Ezek"],
-    "verses": [28, 10, 27, 17, 17, 14, 27, 18, 11, 22, 25, 28, 23, 23, 8, 63, 24, 32, 14, 49, 32, 31, 49, 27, 17, 21, 36, 26, 21, 26, 18, 32, 33, 31, 15, 38, 28, 23, 29, 49, 26, 20, 27, 31, 25, 24, 23, 35],
-    "names": {
-      "en": ["Ezekiel", "Ezech", "Ezek", "Eze", "Ezk", "Ez"],
-      "sv": ["Hes"],
-      "vi": ["Ê-xê-chi-ên"]
-    }
-  },
-  {
-    "number": 27, "name": "Daniel", "osis": ["Dan"],
-    "verses": [21, 49, 30, 37, 31, 28, 28, 27, 27, 21, 45, 13],
-    "names": {
-      "en": ["Daniel", "Dani", "Dan", "Da", "Dn"],
-      "sv": ["Dan"],
-      "vi": ["Đa"]
-    }
-  },
-  {
-    "number": 28, "name": "Hosea", "osis": ["Hos"],
-    "verses": [11, 23, 5, 19, 15, 11, 16, 14, 17, 15, 12, 14, 16, 9],
-    "names": {
-      "en": ["Hosea", "Hos", "Ho"],
-      "sv": ["Hos"],
-      "vi": ["Ô-sê"]
-    }
-  },
-  {
-    "number": 29, "name": "Joel", "osis": ["Joel"],
-    "verses": [20, 32, 21],
-    "names": {
-      "en": ["Joel", "Joe", "Jol", "Jl"],
-      "sv": ["Joel"],
-      "vi": ["Giô-ên"]
-    }
-  },
-  {
-    "number": 30, "name": "Amos", "osis": ["Amos"],
-    "verses": [15, 16, 15, 13, 27, 14, 17, 14, 15],
-    "names": {
-      "en": ["Amos", "Amo", "Am"],
-      "sv": ["Amos"],
-      "vi": ["A-mốt"]
-    }
-  },
-  {
-    "number": 31, "name": "Obadiah", "osis": ["Obad"],
-    "verses": [21],
-    "names": {
-      "en": ["Obadiah", "Obad", "Oba", "Obd", "Ob"],
-      "sv": ["Ob"],
-      "vi": ["Áp-đia"]
-    }
-  },
-  {
-    "number": 32, "name": "Jonah", "osis": ["Jonah"],
-    "verses": [17, 10, 10, 11],
-    "names": {
-      "en": ["Jonah", "Jona", "Jon", "Jnh", "Jh"],
-      "sv": ["Jona"],
-      "vi": ["Giô-na"]
-    }
-  },
-  {
-    "number": 33, "name": "Micah", "osis": ["Mic"],
-    "verses": [16, 13, 12, 13, 15, 16, 20],
-    "names": {
-      "en": ["Micah", "Mic", "Mi"],
-      "sv": ["Mik", "Mika"],
-      "vi": ["Mi-chê"]
-    }
-  },
-  {
-    "number": 34, "name": "Nahum", "osis": ["Nah"],
-    "verses": [15, 13, 19],
-    "names": {
-      "en": ["Nahum", "Nah", "Na", "Nab"],
-      "sv": ["Nah"],
-      "vi": ["Na-hum"]
-    }
-  },
-  {
-    "number": 35, "name": "Habakkuk", "osis": ["Hab"],
-    "verses": [17, 20, 19],
-    "names": {
-      "en": ["Habakkuk", "Habak", "Habb", "Hab", "Hb"],
-      "sv": ["Hab"],
-      "vi": ["Ha-ba-cúc"]
-    }
-  },
-  {
-    "number": 36, "name": "Zephaniah", "osis": ["Zeph"],
-    "verses": [18, 15, 20],
-    "names": {
-      "en": ["Zephaniah", "Zeph", "Zep", "Ze", "Zp"],
-      "sv": ["Sef"],
-      "vi": ["Sô-phô-ni"]
-    }
-  },
-  {
-    "number": 37, "name": "Haggai", "osis": ["Hag"],
-    "verses": [15, 23],
-    "names": {
-      "en": ["Haggai", "Hagg", "Hag", "Hg"],
-      "sv": ["Hagg"],
-      "vi": ["A-ghê"]
-    }
-  },
-  {
-    "number": 38, "name": "Zechariah", "osis": ["Zech"],
-    "verses": [21, 13, 10, 14, 11, 15, 14, 23, 17, 12, 17, 14, 9, 21],
-    "names": {
-      "en": ["Zechariah", "Zech", "Zec", "Zch", "Zc", "Za"],
-      "sv": ["Sak"],
-      "vi": ["Xa-cha-ri"]
-    }
-  },
-  {
-    "number": 39, "name": "Malachi", "osis": ["Mal"],
-    "verses": [14, 17, 18, 6],
-    "names": {
-      "en": ["Malachi", "Malach", "Mal", "Ma", "Ml"],
-      "sv": ["Mal"],
-      "vi": ["Ma-la-chi", "Mal"]
-    }
-  },
-  {
-    "number": 40, "name": "Matthew", "osis": ["Matt"],
-    "verses": [25, 23, 17, 25, 48, 34, 29, 34, 38, 42, 30, 50, 58, 36, 39, 28, 27, 35, 30, 34, 46, 46, 39, 51, 46, 75, 66, 20],
-    "names": {
-      "en": ["Matthew", "Matt", "Mat", "Mt"],
-      "sv": ["Matt"],
-      "vi": ["Ma", "Mat", "Mt"]
-    }
-  },
-  {
-    "number": 41, "name": "Mark", "osis": ["Mark"],
-    "verses": [45, 28, 35, 41, 43, 56, 37, 38, 50, 52, 33, 44, 37, 72, 47, 20],
-    "names": {
-      "en": ["Mark", "Mrk", "Mr", "Mk"],
-      "sv": ["Mark"],
-      "vi": ["Mác", "Mc"]
-    }
-  },
-  {
-    "number": 42, "name": "Luke", "osis": ["Luke"],
-    "verses": [80, 52, 38, 44, 39, 49, 50, 56, 62, 42, 54, 59, 35, 35, 32, 31, 37, 43, 48, 47, 38, 71, 56, 53],
-    "names": {
-      "en": ["Luke", "Luk", "Lu", "Lk"],
-      "sv": ["Luk"],
-      "vi": ["Lu", "Luc", "Lc"]
-    }
-  },
-  {
-    "number": 43, "name": "John", "osis": ["John"],
-    "verses": [51, 25, 36, 54, 47, 71, 53, 59, 41, 42, 57, 50, 38, 31, 27, 33, 26, 40, 42, 31, 25],
-    "names": {
-      "en": ["John", "Joh", "Jo", "Jn", "Jhn"],
-      "sv": ["Joh"],
-      "vi": ["Gi", "Giăng", "Jn"]
-    }
-  },
-  {
-    "number": 44, "name": "Acts", "osis": ["Acts"],
-    "verses": [26, 47, 26, 37, 42, 15, 60, 40, 43, 48, 30, 25, 52, 28, 41, 40, 34, 28, 41, 38, 40, 30, 35, 27, 27, 32, 44, 31],
-    "names": {
-      "en": ["Acts of the Apostles", "Acts", "Act", "Ac"],
-      "sv": ["Apg"],
-      "vi": ["Công", "Ac"]
-    }
-  },
-  {
-    "number": 45, "name": "Romans", "osis": ["Rom"],
-    "verses": [32, 29, 31, 25, 21, 23, 25, 39, 33, 21, 36, 21, 14, 23, 33, 27],
-    "names": {
-      "en": ["Romans", "Roma", "Rom", "Ro", "Rm"],
-      "sv": ["Rom"],
-      "vi": ["Rô"]
-    }
-  },
-  {
-    "number": 46, "name": "I Corinthians", "osis": ["1Cor"],
-    "verses": [31, 16, 23, 21, 13, 20, 40, 13, 27, 33, 34, 31, 13, 40, 58, 24],
-    "names": {
-      "en": ["1 Corinthians", "1 Corinth", "1 Cor", "1 Co", "1 Kor"],
-      "sv": ["1 Kor"],
-      "vi": ["1 Cô", "1 Co"]
-    }
-  },
-  {
-    "number": 47, "name": "II Corinthians", "osis": ["2Cor"],
-    "verses": [24, 17, 18, 18, 21, 18, 16, 24, 15, 18, 33, 21, 14],
-    "names": {
-      "en": ["2 Corinthians", "2 Corinth", "2 Cor", "2 Co", "2 Kor"],
-      "sv": ["2 Kor"],
-      "vi": ["2 Cô", "2 Co"]
-    }
-  },
-  {
-    "number": 48, "name": "Galatians", "osis": ["Gal"],
-    "verses": [24, 21, 29, 31, 26, 18],
-    "names": {
-      "en": ["Galatians", "Galat", "Gala", "Gal", "Ga"],
-      "sv": ["Gal"],
-      "vi": ["Gal", "Ga"]
-    }
-  },
-  {
-    "number": 49, "name": "Ephesians", "osis": ["Eph"],
-    "verses": [23, 22, 21, 32, 33, 24],
-    "names": {
-      "en": ["Ephesians", "Ephes", "Eph"],
-      "sv": ["Ef"],
-      "vi": ["Êph", "Ê-phê-sô"]
-    }
-  },
-  {
-    "number": 50, "name": "Philippians", "osis": ["Phil"],
-    "verses": [30, 30, 21, 23],
-    "names": {
-      "en": ["Philippians", "Philip", "Phil", "Php", "Phlp", "Phl", "Phi"],
-      "sv": ["Fil"],
-      "vi": ["Phil", "Phi"]
-    }
-  },
-  {
-    "number": 51, "name": "Colossians", "osis": ["Col"],
-    "verses": [29, 23, 25, 18],
-    "names": {
-      "en": ["Colossians", "Coloss", "Col"],
-      "sv": ["Kol"],
-      "vi": ["Côl", "Cô-lô-se"]
-    }
-  },
-  {
-    "number": 52, "name": "I Thessalonians", "osis": ["1Thess"],
-    "verses": [10, 20, 13, 18, 28],
-    "names": {
-      "en": ["1 Thessalonians", "1 Thess", "1 Thes", "1 Th"],
-      "sv": ["1 Tess"],
-      "vi": ["1 Tê"]
-    }
-  },
-  {
-    "number": 53, "name": "II Thessalonians", "osis": ["2Thess"],
-    "verses": [12, 17, 18],
-    "names": {
-      "en": ["2 Thessalonians", "2 Thess", "2 Thes", "2 Th"],
-      "sv": ["2 Tess"],
-      "vi": ["2 Tê"]
-    }
-  },
-  {
-    "number": 54, "name": "I Timothy", "osis": ["1Tim"],
-    "verses": [20, 15, 16, 16, 25, 21],
-    "names": {
-      "en": ["1 Timothy", "1 Tim", "1 Ti", "1 Tm"],
-      "sv": ["1 Tim"],
-      "vi": ["1 Ti", "1 Tim"]
-    }
-  },
-  {
-    "number": 55, "name": "II Timothy", "osis": ["2Tim"],
-    "verses": [18, 26, 17, 22],
-    "names": {
-      "en": ["2 Timothy", "2 Tim", "2 Ti", "2 Tm"],
-      "sv": ["2 Tim"],
-      "vi": ["2 Ti", "2 Tim"]
-    }
-  },
-  {
-    "number": 56, "name": "Titus", "osis": ["Titus"],
-    "verses": [16, 15, 15],
-    "names": {
-      "en": ["Titus", "Tit", "Ti"],
-      "sv": ["Tit"],
-      "vi": ["Tít", "Tit"]
-    }
-  },
-  {
-    "number": 57, "name": "Philemon", "osis": ["Phlm"],
-    "verses": [25],
-    "names": {
-      "en": ["Philemon", "Philem", "Phile", "Phlm", "Phle", "Phm"],
-      "sv": ["Filem"],
-      "vi": ["Philm", "Phlm", "Phm", "Phi-lê-môn"]
-    }
-  },
-  {
-    "number": 58, "name": "Hebrews", "osis": ["Heb"],
-    "verses": [14, 18, 19, 16, 14, 20, 28, 13, 28, 39, 40, 29, 25],
-    "names": {
-      "en": ["Hebrews", "Hebr", "Heb", "He"],
-      "sv": ["Hebr"],
-      "vi": ["Hê", "Hé"]
-    }
-  },
-  {
-    "number": 59, "name": "James", "osis": ["Jas"],
-    "verses": [27, 26, 18, 17, 20],
-    "names": {
-      "en": ["James", "Jame", "Jas", "Jam", "Ja", "Jm"],
-      "sv": ["Jak"],
-      "vi": ["Gia"]
-    }
-  },
-  {
-    "number": 60, "name": "I Peter", "osis": ["1Pet"],
-    "verses": [25, 25, 22, 19, 14],
-    "names": {
-      "en": ["1 Peter", "1 Pet", "1 Pe", "1 Pt"],
-      "sv": ["1 Petr"],
-      "vi": ["1 Phi"]
-    }
-  },
-  {
-    "number": 61, "name": "II Peter", "osis": ["2Pet"],
-    "verses": [21, 22, 18],
-    "names": {
-      "en": ["2 Peter", "2 Pet", "2 Pe", "2 Pt"],
-      "sv": ["2 Petr"],
-      "vi": ["2 Phi"]
-    }
-  },
-  {
-    "number": 62, "name": "I John", "osis": ["1John"],
-    "verses": [10, 29, 24, 21, 21],
-    "names": {
-      "en": ["1 John", "1 Joh", "1 Jo", "1 Jn", "1 Jhn"],
-      "sv": ["1 Joh"],
-      "vi": ["1 Gi"]
-    }
-  },
-  {
-    "number": 63, "name": "II John", "osis": ["2John"],
-    "verses": [13],
-    "names": {
-      "en": ["2 John", "2 Joh", "2 Jo", "2 Jn", "2 Jhn"],
-      "sv": ["2 Joh"],
-      "vi": ["2 Gi"]
-    }
-  },
-  {
-    "number": 64, "name": "III John", "osis": ["3John"],
-    "verses": [14],
-    "names": {
-      "en": ["3 John", "3 Joh", "3 Jo", "3 Jn", "3 Jhn"],
-      "sv": ["3 Joh"],
-      "vi": ["3 Gi"]
-    }
-  },
-  {
-    "number": 65, "name": "Jude", "osis": ["Jude"],
-    "verses": [25],
-    "names": {
-      "en": ["Jude", "Jde"],
-      "sv": ["Jud"],
-      "vi": ["Giu", "Giu-đê"]
-    }
-  },
-  {
-    "number": 66, "name": "Revelation of John", "osis": ["Rev"],
-    "verses": [20, 29, 22, 11, 14, 17, 17, 13, 21, 11, 19, 17, 18, 20, 8, 21, 18, 24, 21, 15, 27, 21],
-    "names": {
-      "en": ["Revelation of St John", "Revelation of John", "Revelation", "Reve", "Rev", "Re", "Rv", "Apocalypse", "Apoc"],
-      "sv": ["Upp"],
-      "vi": ["Khải", "Rev"]
-    }
-  },
-  {
-    "number": 67, "name": "I Esdras", "osis": ["1Esd"],
-    "verses": [58, 30, 24, 63, 73, 34, 15, 96, 55],
-    "names": {
-      "en": ["1 Esdras", "1 Esdr", "1 Esd", "1 Es", "3 Esdras", "3 Esdr", "3 Esd", "3 Es"]
-    }
-  },
-  {
-    "number": 68, "name": "II Esdras", "osis": ["2Esd"],
-    "verses": [40, 48, 36, 52, 56, 59, 70, 63, 47, 59, 46, 51, 58, 48, 63, 78],
-    "names": {
-      "en": ["2 Esdras", "2 Esdr", "2 Esd", "2 Es", "4 Esdras", "4 Esdr", "4 Esd", "4 Es", "4 Ezra"]
-    }
-  },
-  {
-    "number": 69, "name": "Tobit", "osis": ["Tob"],
-    "verses": [22, 14, 17, 21, 22, 17, 18, 21, 6, 12, 19, 22, 18, 15],
-    "names": {
-      "en": ["Tobit", "Tobias", "Tob"],
-      "sv": ["Tob"]
-    }
-  },
-  {
-    "number": 70, "name": "Judith", "osis": ["Jdt"],
-    "verses": [16, 28, 10, 15, 24, 21, 32, 36, 14, 23, 23, 20, 20, 19, 13, 25],
-    "names": {
-      "en": ["Judith", "Jdth", "Jdt", "Jth"],
-      "sv": ["Judit"]
-    }
-  },
-  {
-    "number": 71, "name": "Additions to Esther", "osis": ["AddEsth", "EsthGr"],
-    "verses": [1, 1, 1, 1, 1, 1, 1, 1, 1, 13, 12, 6, 18, 19, 16, 24],
-    "names": {
-      "en": ["Additions to Esther", "Additions to Es", "Add Esth", "Add Es", "Ad Es", "AddEsth", "Rest of Esther", "Greek Esther", "EsthGr"],
-      "sv": ["Tillägg till Est", "Tillägg till Ester"]
-    }
-  },
-  {
-    "number": 72, "name": "Additional Psalm", "osis": ["Ps151"],
-    "verses": [7],
-    "names": {
-      "en": ["Ps151", "Psalm151", "AddPs"]
-    }
-  },
-  {
-    "number": 73, "name": "Wisdom", "osis": ["Wis"],
-    "verses": [16, 24, 19, 20, 23, 25, 30, 21, 18, 21, 26, 27, 19, 31, 19, 29, 21, 25, 22],
-    "names": {
-      "en": ["Wisdom of Solomon", "Wisd of Sol", "Wis of Sol", "Wisd", "Wis", "Wi", "WisSol", "Sapientia", "Sap"],
-      "sv": ["Vish"]
-    }
-  },
-  {
-    "number": 74, "name": "Sirach", "osis": ["Sir"],
-    "verses": [30, 18, 31, 31, 15, 37, 36, 19, 18, 31, 34, 18, 26, 27, 20, 30, 32, 33, 30, 32, 28, 27, 28, 34, 26, 29, 30, 26, 28, 25, 31, 24, 31, 26, 20, 26, 31, 34, 35, 30, 24, 25, 33, 22, 26, 20, 25, 25, 16, 29, 30],
-    "names": {
-      "en": ["Ecclesiasticus", "Ecclus", "Eccli", "Sirach", "Ben Sira", "Sir", "Si"],
-      "sv": ["Syr"]
-    }
-  },
-  {
-    "number": 75, "name": "Baruch", "osis": ["Bar", "EpJer"],
-    "verses": [22, 35, 37, 37, 9, 73],
-    "names": {
-      "en": ["Baruch", "Bar", "Ba", "Epistle of Jeremiah", "Epistle of Jeremy", "Letter of Jeremiah", "Ep Jer", "Ep Je", "EpJer", "Let Jer", "LJe"],
-      "sv": ["Bar", "Baruk"]
-    }
-  },
-  {
-    "number": 76, "name": "Prayer of Azariah", "osis": ["PrAzar"],
-    "verses": [68],
-    "names": {
-      "en": ["Prayer of Azariah", "Pr Azar", "PrAzar", "Song of the Three Holy Children", "Song of the Three Children", "Song of Three Children", "Song of the Three", "Song of Three", "Sg Three", "Three Children"]
-    }
-  },
-  {
-    "number": 77, "name": "Susanna", "osis": ["Sus"],
-    "verses": [64],
-    "names": {
-      "en": ["Susanna", "Sus", "Su"]
-    }
-  },
-  {
-    "number": 78, "name": "Bel and the Dragon", "osis": ["Bel"],
-    "verses": [42],
-    "names": {
-      "en": ["Bel and the Dragon", "Bel and Dragon", "Bel"],
-      "sv": ["Bel i Babylon"]
-    }
-  },
-  {
-    "number": 79, "name": "Prayer of Manasses", "osis": ["PrMan"],
-    "verses": [1],
-    "names": {
-      "en": ["Prayer of Manasses", "Prayer of Manasseh", "Pr Man", "PrMan"]
-    }
-  },
-  {
-    "number": 80, "name": "I Maccabees", "osis": ["1Macc"],
-    "verses": [64, 70, 60, 61, 68, 63, 50, 32, 73, 89, 74, 53, 53, 49, 41, 24],
-    "names": {
-      "en": ["1 Maccabees", "1 Macc", "1 Mac", "1 Mach", "1 Ma", "1 Mc"],
-      "sv": ["1 Mack"]
-    }
-  },
-  {
-    "number": 81, "name": "II Maccabees", "osis": ["2Macc"],
-    "verses": [36, 32, 40, 50, 27, 31, 42, 36, 29, 38, 38, 45, 26, 46, 39],
-    "names": {
-      "en": ["2 Maccabees", "2 Macc", "2 Mac", "2 Mach", "2 Ma", "2 Mc"],
-      "sv": ["2 Mack"]
-    }
-  },
-  {
-    "number": 82, "name": "III Maccabees", "osis": ["3Macc"],
-    "verses": [29, 33, 30, 21, 51, 41, 23],
-    "names": {
-      "en": ["3 Maccabees", "3 Macc", "3 Mac", "3 Mach", "3 Ma", "3 Mc"]
-    }
-  },
-  {
-    "number": 83, "name": "IV Maccabees", "osis": ["4Macc"],
-    "verses": [35, 24, 21, 26, 38, 35, 23, 29, 32, 21, 27, 19, 27, 20, 32, 25, 24, 24],
-    "names": {
-      "en": ["4 Maccabees", "4 Macc", "4 Mac", "4 Mach", "4 Ma", "4 Mc"]
-    }
-  }
+  {"number": 1, "name": "Genesis", "osis": ["Gen"]},
+  {"number": 2, "name": "Exodus", "osis": ["Exod"]},
+  {"number": 3, "name": "Leviticus", "osis": ["Lev"]},
+  {"number": 4, "name": "Numbers", "osis": ["Num"]},
+  {"number": 5, "name": "Deuteronomy", "osis": ["Deut"]},
+  {"number": 6, "name": "Joshua", "osis": ["Josh"]},
+  {"number": 7, "name": "Judges", "osis": ["Judg"]},
+  {"number": 8, "name": "Ruth", "osis": ["Ruth"]},
+  {"number": 9, "name": "I Samuel", "osis": ["1Sam"]},
+  {"number": 10, "name": "II Samuel", "osis": ["2Sam"]},
+  {"number": 11, "name": "I Kings", "osis": ["1Kgs"]},
+  {"number": 12, "name": "II Kings", "osis": ["2Kgs"]},
+  {"number": 13, "name": "I Chronicles", "osis": ["1Chr"]},
+  {"number": 14, "name": "II Chronicles", "osis": ["2Chr"]},
+  {"number": 15, "name": "Ezra", "osis": ["Ezra"]},
+  {"number": 16, "name": "Nehemiah", "osis": ["Neh"]},
+  {"number": 17, "name": "Esther", "osis": ["Esth"]},
+  {"number": 18, "name": "Job", "osis": ["Job"]},
+  {"number": 19, "name": "Psalms", "osis": ["Ps"]},
+  {"number": 20, "name": "Proverbs", "osis": ["Prov"]},
+  {"number": 21, "name": "Ecclesiastes", "osis": ["Eccl"]},
+  {"number": 22, "name": "Song of Solomon", "osis": ["Song"]},
+  {"number": 23, "name": "Isaiah", "osis": ["Isa"]},
+  {"number": 24, "name": "Jeremiah", "osis": ["Jer"]},
+  {"number": 25, "name": "Lamentations", "osis": ["Lam"]},
+  {"number": 26, "name": "Ezekiel", "osis": ["Ezek"]},
+  {"number": 27, "name": "Daniel", "osis": ["Dan"]},
+  {"number": 28, "name": "Hosea", "osis": ["Hos"]},
+  {"number": 29, "name": "Joel", "osis": ["Joel"]},
+  {"number": 30, "name": "Amos", "osis": ["Amos"]},
+  {"number": 31, "name": "Obadiah", "osis": ["Obad"]},
+  {"number": 32, "name": "Jonah", "osis": ["Jonah"]},
+  {"number": 33, "name": "Micah", "osis": ["Mic"]},
+  {"number": 34, "name": "Nahum", "osis": ["Nah"]},
+  {"number": 35, "name": "Habakkuk", "osis": ["Hab"]},
+  {"number": 36, "name": "Zephaniah", "osis": ["Zeph"]},
+  {"number": 37, "name": "Haggai", "osis": ["Hag"]},
+  {"number": 38, "name": "Zechariah", "osis": ["Zech"]},
+  {"number": 39, "name": "Malachi", "osis": ["Mal"]},
+  {"number": 40, "name": "Matthew", "osis": ["Matt"]},
+  {"number": 41, "name": "Mark", "osis": ["Mark"]},
+  {"number": 42, "name": "Luke", "osis": ["Luke"]},
+  {"number": 43, "name": "John", "osis": ["John"]},
+  {"number": 44, "name": "Acts", "osis": ["Acts"]},
+  {"number": 45, "name": "Romans", "osis": ["Rom"]},
+  {"number": 46, "name": "I Corinthians", "osis": ["1Cor"]},
+  {"number": 47, "name": "II Corinthians", "osis": ["2Cor"]},
+  {"number": 48, "name": "Galatians", "osis": ["Gal"]},
+  {"number": 49, "name": "Ephesians", "osis": ["Eph"]},
+  {"number": 50, "name": "Philippians", "osis": ["Phil"]},
+  {"number": 51, "name": "Colossians", "osis": ["Col"]},
+  {"number": 52, "name": "I Thessalonians", "osis": ["1Thess"]},
+  {"number": 53, "name": "II Thessalonians", "osis": ["2Thess"]},
+  {"number": 54, "name": "I Timothy", "osis": ["1Tim"]},
+  {"number": 55, "name": "II Timothy", "osis": ["2Tim"]},
+  {"number": 56, "name": "Titus", "osis": ["Titus"]},
+  {"number": 57, "name": "Philemon", "osis": ["Phlm"]},
+  {"number": 58, "name": "Hebrews", "osis": ["Heb"]},
+  {"number": 59, "name": "James", "osis": ["Jas"]},
+  {"number": 60, "name": "I Peter", "osis": ["1Pet"]},
+  {"number": 61, "name": "II Peter", "osis": ["2Pet"]},
+  {"number": 62, "name": "I John", "osis": ["1John"]},
+  {"number": 63, "name": "II John", "osis": ["2John"]},
+  {"number": 64, "name": "III John", "osis": ["3John"]},
+  {"number": 65, "name": "Jude", "osis": ["Jude"]},
+  {"number": 66, "name": "Revelation of John", "osis": ["Rev"]},
+  {"number": 67, "name": "I Esdras", "osis": ["1Esd"]},
+  {"number": 68, "name": "II Esdras", "osis": ["2Esd"]},
+  {"number": 69, "name": "Tobit", "osis": ["Tob"]},
+  {"number": 70, "name": "Judith", "osis": ["Jdt"]},
+  {"number": 71, "name": "Additions to Esther", "osis": ["AddEsth", "EsthGr"]},
+  {"number": 72, "name": "Additional Psalm", "osis": ["Ps151"]},
+  {"number": 73, "name": "Wisdom", "osis": ["Wis"]},
+  {"number": 74, "name": "Sirach", "osis": ["Sir"]},
+  {"number": 75, "name": "Baruch", "osis": ["Bar", "EpJer"]},
+  {"number": 76, "name": "Prayer of Azariah", "osis": ["PrAzar"]},
+  {"number": 77, "name": "Susanna", "osis": ["Sus"]},
+  {"number": 78, "name": "Bel and the Dragon", "osis": ["Bel"]},
+  {"number": 79, "name": "Prayer of Manasses", "osis": ["PrMan"]},
+  {"number": 80, "name": "I Maccabees", "osis": ["1Macc"]},
+  {"number": 81, "name": "II Maccabees", "osis": ["2Macc"]},
+  {"number": 82, "name": "III Maccabees", "osis": ["3Macc"]},
+  {"number": 83, "name": "IV Maccabees", "osis": ["4Macc"]}
 ]
+

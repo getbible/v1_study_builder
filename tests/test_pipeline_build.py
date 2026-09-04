@@ -80,7 +80,7 @@ class StubExporter:
 
 
 @pytest.fixture
-def built(tmp_path, project_root, monkeypatch):
+def built(tmp_path, project_root, monkeypatch, bible_tree):
     monkeypatch.setattr(pipeline_module, "ModuleInstaller", StubInstaller)
     monkeypatch.setattr(pipeline_module, "SwordExporter", StubExporter)
     monkeypatch.setattr(BuildPipeline, "_catalog", lambda self: [COMMENTARY, DICTIONARY])
@@ -96,6 +96,8 @@ def built(tmp_path, project_root, monkeypatch):
         schemas_dir=project_root / "schemas",
         engine_manifest_path=project_root / "conf/getbiblesword.json",
         engine_schema_path=project_root / "schemas/getbiblesword-ndjson-v1.schema.json",
+        aliases_dir=project_root / "conf/book_aliases",
+        bible_api=str(bible_tree),
     )
     report = BuildPipeline(config).run()
     return report, tmp_path / "dist"

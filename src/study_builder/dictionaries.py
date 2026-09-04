@@ -14,9 +14,9 @@ from urllib.parse import quote, unquote
 from jsonschema import validate
 
 from study_builder.books import BookRegistry
-from study_builder.content import extract_osis_references, public_content
+from study_builder.content import extract_markup_references, public_content
 from study_builder.models import ModuleDescriptor, NativeExport
-from study_builder.references import ReferenceParser
+from study_builder.references import ReferenceEngine
 from study_builder.util import (
     DOCUMENT_CEILING_BYTES,
     enforce_document_ceiling,
@@ -41,6 +41,11 @@ _SEARCH_NOISE = re.compile(r"[^\w\s-]", re.UNICODE)
 
 # Reserved inside a dictionary directory; an entry may never claim these names.
 RESERVED_DOCUMENTS = {"metadata.json", "index.json"}
+
+
+def source_type(module: ModuleDescriptor, metadata: dict[str, Any]) -> str:
+    """The markup family the module is written in: ThML, OSIS, TEI, GBF, or nothing."""
+    return module.first("sourcetype") or str(metadata.get("sourcetype", "") or "")
 
 
 def strong_prefix(module: ModuleDescriptor, metadata: dict[str, Any]) -> str | None:
@@ -140,18 +145,21 @@ class DictionaryWriter:
         books: BookRegistry,
         schemas_dir: Path,
         max_document_bytes: int = DOCUMENT_CEILING_BYTES,
+        *,
+        references: ReferenceEngine,
     ) -> None:
         self.root = root
         self.books = books
         self.max_document_bytes = max_document_bytes
         self.schema = read_json(schemas_dir / "dictionary-entry.schema.json")
-        self.parser: ReferenceParser | None = None
+        self.references = references
+        self.source_type = ""
 
     def write(self, module: ModuleDescriptor, exported: NativeExport) -> tuple[dict, dict]:
         module_id = slug(module.name)
         module_root = self.root / module_id
         prefix = strong_prefix(module, exported.metadata)
-        self.parser = ReferenceParser(self.books, module.language)
+        self.source_type = source_type(module, exported.metadata)
 
         staged = self._stage(exported, prefix)
         self._resolve_links(staged)
@@ -208,6 +216,7 @@ class DictionaryWriter:
         metadata = self._metadata(
             module, module_id, prefix, len(staged), unique_keys, complete_bytes
         )
+        metadata["references"] = self.references.describe()
         write_json(module_root / "metadata.json", metadata)
         record = {
             "id": module_id,
@@ -221,11 +230,10 @@ class DictionaryWriter:
         }
         return record, metadata
 
-    @staticmethod
-    def _publishable(source: dict[str, Any]) -> dict[str, str] | None:
+    def _publishable(self, source: dict[str, Any]) -> dict[str, str] | None:
         if not str(source.get("key", "")).strip():
             return None
-        content = public_content(source)
+        content = public_content(source, source_type=self.source_type)
         return content if content["text"] else None
 
     def _stage(self, exported: NativeExport, prefix: str | None) -> list[_Staged]:
@@ -310,18 +318,15 @@ class DictionaryWriter:
             document["backlinks"] = [
                 {"id": target, "key": by_id[target].key} for target in item.backlinks
             ]
-        references = []
-        for reference in extract_osis_references(
-            str(source.get("raw", "")), str(source.get("html", ""))
-        ):
-            normalized = self.books.reference(reference)
-            if normalized:
-                references.append(normalized)
-        if not references and self.parser is not None:
-            # The source did not mark its references up, so they exist only as
-            # prose. Recognise them there, so a client can still link the word to
-            # the Bible without parsing the text itself.
-            references = self.parser.extract(content["text"])
+        # What the markup cites is authoritative for the text it covers; the rest of
+        # the text is read as prose, so a client can link the word to the Bible
+        # without parsing the text itself.
+        references = self.references.extract(
+            content["text"],
+            markup=extract_markup_references(
+                str(source.get("raw", "")), str(source.get("html", ""))
+            ),
+        )
         if references:
             document["references"] = references
         validate(document, self.schema)

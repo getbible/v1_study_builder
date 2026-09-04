@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 license = {text = "GPL-2.0-only"}
 authors = [{name = "GetBible", email = "github@vdm.io"}]
 dependencies = [
+  "getbible>=2.0.0,<3",
   "jsonschema>=4.23,<5",
 ]
 
@@ -33,6 +34,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers"
 testpaths = ["tests"]
+pythonpath = ["tests"]
 
 [tool.ruff]
 target-version = "py312"
@@ -40,4 +42,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["study_builder", "support"]
 

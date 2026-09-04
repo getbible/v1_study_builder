@@ -207,3 +207,18 @@ def test_rejects_error_diagnostic_even_with_success_footer(
     with pytest.raises(ContractError, match="error diagnostic") as captured:
         reader.read(io.BytesIO(stream(records)))
     assert "synthetic.error: Synthetic failure" in str(captured.value)
+
+
+def test_module_text_is_decoded_without_losing_characters() -> None:
+    from study_builder.contract import decode_module_text
+
+    # A module declared UTF-8 that carries Windows-1252 bytes: the apostrophe of
+    # "David’s" and the non-breaking space of "1 Chronicles" survive.
+    assert decode_module_text(b"Moses\x92 departure (1\xa0Chronicles 2:3) caf\xc3\xa9") == (
+        "Moses’ departure (1 Chronicles 2:3) café"
+    )
+    assert decode_module_text(b"Moses\x92 departure caf\xe9", "Latin-1") == (
+        "Moses’ departure café"
+    )
+    assert decode_module_text(b"plain") == "plain"
+    assert decode_module_text(b"\x81\x8d") == "\x81\x8d"

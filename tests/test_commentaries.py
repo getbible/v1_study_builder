@@ -42,12 +42,19 @@ def entry(osis, book, chapter, verse, text, *, raw=None, html=""):
     }
 
 
+@pytest.fixture(autouse=True)
+def _engine(reference_engine):
+    global ENGINE
+    ENGINE = reference_engine
+
+
 def write(tmp_path, project_root, module, entries, max_document_bytes=0):
     writer = CommentaryWriter(
         tmp_path,
         BookRegistry(project_root / "conf/book_registry.json"),
         project_root / "schemas",
         max_document_bytes,
+        references=ENGINE,
     )
     return writer.write(module, NativeExport(metadata={"record_type": "module"}, entries=entries))
 
@@ -255,8 +262,12 @@ def test_collapsed_entry_keeps_every_reference_from_the_range(
         project_root,
         commentary_module,
         [
-            entry("Gen.1.1", 1, 1, 1, shared, raw="see John.3.16"),
-            entry("Gen.1.2", 1, 1, 2, shared, raw="see Rom.5.8"),
+            entry(
+                "Gen.1.1", 1, 1, 1, shared, raw='see <reference osisRef="John.3.16">it</reference>'
+            ),
+            entry(
+                "Gen.1.2", 1, 1, 2, shared, raw='see <reference osisRef="Rom.5.8">it</reference>'
+            ),
         ],
     )
     chapter = json.loads((tmp_path / "testcom/1/1.json").read_text(encoding="utf-8"))
@@ -312,11 +323,11 @@ def test_prose_references_inherit_the_commented_book_and_chapter(
     chapter = json.loads((tmp_path / "testcom/43/3.json").read_text(encoding="utf-8"))
     published = chapter["entries"][0]
     assert published["verses"] == [16, 17]
-    assert [(item["ref"], item["book"]) for item in published["references"]] == [
-        ("John 3:17", 43),
-        ("John 1:1", 43),
-        ("Ro 5:8", 45),
-        ("Ro 6:23", 45),
+    assert [(item["text"], item["ref"], item["book"]) for item in published["references"]] == [
+        ("ver. 17", "John 3:17", 43),
+        ("1:1", "John 1:1", 43),
+        ("Ro 5:8", "Romans 5:8", 45),
+        ("6:23", "Romans 6:23", 45),
     ]
     introduction = json.loads((tmp_path / "testcom/43/0.json").read_text(encoding="utf-8"))
     assert introduction["entries"][0]["references"] == [
