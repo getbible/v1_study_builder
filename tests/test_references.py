@@ -752,3 +752,24 @@ def test_a_scripref_with_passage_and_parsed_is_one_citation(english) -> None:
             "verses": [2, 8],
         }
     ]
+
+
+def test_repeated_display_text_preserves_each_markup_citations_context(english) -> None:
+    from study_builder.content import extract_markup_references, normalize_text, strip_markup
+
+    raw = (
+        '<scripRef passage="Gen 1:1">1:1</scripRef> also 1:2; '
+        '<scripRef passage="Ex 1:1">1:1</scripRef> also 1:3; '
+        '<scripRef passage="Lev 1:1">1:1</scripRef> also 1:4.'
+    )
+    items = english.extract(
+        normalize_text(strip_markup(raw)), markup=extract_markup_references(raw)
+    )
+    assert [(item["text"], item["ref"]) for item in items] == [
+        ("1:1", "Genesis 1:1"),
+        ("1:2", "Genesis 1:2"),
+        ("1:1", "Exodus 1:1"),
+        ("1:3", "Exodus 1:3"),
+        ("1:1", "Leviticus 1:1"),
+        ("1:4", "Leviticus 1:4"),
+    ]

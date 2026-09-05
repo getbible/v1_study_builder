@@ -1325,16 +1325,20 @@ def _locate(text: str, display: str, start: int, occurrence: int = 0) -> tuple[i
     1:1" is the second one. Failing that, the first occurrence from ``start``.
     """
     pattern = re.compile(r"\s+".join(re.escape(word) for word in display.split()))
-    matches = [match for match in pattern.finditer(text) if match.end() > start]
-    if not matches:
-        return None
-    candidates = [match for match in matches if match.start() >= start]
-    if not candidates:
-        return None
-    before = len(matches) - len(candidates)
-    chosen = candidates[occurrence - before] if 0 <= occurrence - before < len(candidates) else None
-    match = chosen or candidates[0]
-    return match.start(), match.end()
+    first: re.Match[str] | None = None
+    # Occurrence is counted from the start of the source text, including matches
+    # before the preceding citation. Dropping those matches changes the index and
+    # can attach a reference (and its inherited book) to a later identical display.
+    for index, match in enumerate(pattern.finditer(text)):
+        if match.start() < start:
+            continue
+        if first is None:
+            first = match
+        if index == occurrence:
+            return match.start(), match.end()
+        if index > occurrence:
+            break
+    return (first.start(), first.end()) if first is not None else None
 
 
 def _dedupe(items: Iterable[dict]) -> list[dict]:
