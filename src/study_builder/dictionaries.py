@@ -238,28 +238,31 @@ class DictionaryWriter:
 
     def _stage(self, exported: NativeExport, prefix: str | None) -> list[_Staged]:
         staged: list[_Staged] = []
-        used_ids: dict[str, str] = {}
+        used_ids: set[str] = set()
+        base_ids: dict[str, str] = {}
         occurrences: dict[str, int] = defaultdict(int)
         for source in exported.entries:
             if self._publishable(source) is None:
                 continue
             key = str(source["key"]).strip()
             canonical = canonical_strong(key, prefix)
-            entry_id = canonical or encoded_entry_id(key)
-            collision_key = entry_id.casefold()
-            if collision_key in used_ids and used_ids[collision_key] != key:
-                entry_id = "h-" + hashlib.sha256(key.encode("utf-8")).hexdigest()
-                collision_key = entry_id.casefold()
-            occurrences[collision_key] += 1
-            occurrence = occurrences[collision_key]
-            if occurrence > 1:
-                entry_id = f"{entry_id}--{occurrence}"
-            used_ids[entry_id.casefold()] = key
+            if key not in base_ids:
+                entry_id = canonical or encoded_entry_id(key)
+                if entry_id.casefold() in used_ids:
+                    hashed_id = "h-" + hashlib.sha256(key.encode("utf-8")).hexdigest()
+                    entry_id = hashed_id
+                    suffix = 1
+                    while entry_id.casefold() in used_ids:
+                        suffix += 1
+                        entry_id = f"{hashed_id}--{suffix}"
+                base_ids[key] = entry_id
+                used_ids.add(entry_id.casefold())
+            occurrences[key] += 1
             staged.append(
                 _Staged(
-                    entry_id=entry_id,
+                    entry_id=base_ids[key],
                     key=key,
-                    occurrence=occurrence,
+                    occurrence=occurrences[key],
                     aliases=sorted({value for value in (key, canonical) if value}),
                     search=search_key(key),
                     targets=link_candidates(
@@ -267,6 +270,23 @@ class DictionaryWriter:
                     ),
                 )
             )
+
+        # Reserve every first definition's path before adding suffixes. Otherwise
+        # a repeated "A" can overwrite the literal key "A--2", or force that key
+        # onto a different path merely because it appeared later in the source.
+        last_suffix: dict[str, int] = {}
+        for item in staged:
+            if item.occurrence == 1:
+                continue
+            base_id = item.entry_id
+            suffix = last_suffix.get(base_id, 1) + 1
+            entry_id = f"{base_id}--{suffix}"
+            while entry_id.casefold() in used_ids:
+                suffix += 1
+                entry_id = f"{base_id}--{suffix}"
+            last_suffix[base_id] = suffix
+            used_ids.add(entry_id.casefold())
+            item.entry_id = entry_id
         return staged
 
     @staticmethod

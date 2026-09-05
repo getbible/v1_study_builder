@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 import pytest
@@ -170,6 +171,69 @@ def test_dictionary_preserves_repeated_keys_as_distinct_definitions(
     assert index["entries"][1]["occurrence"] == 2
     assert record["entry_count"] == 2
     assert record["unique_key_count"] == 1
+
+
+@pytest.mark.parametrize("literal_first", [False, True])
+def test_repeated_keys_do_not_claim_literal_suffix_paths(
+    tmp_path, project_root, greek_dictionary_module, literal_first
+) -> None:
+    repeated = [{"key": "A", "plain": f"Definition {number}"} for number in range(1, 4)]
+    literal = {"key": "A--2", "plain": "Literal suffix"}
+    entries = [literal, *repeated] if literal_first else [*repeated, literal]
+    record, _ = write(tmp_path, project_root, greek_dictionary_module, entries)
+
+    expected = {
+        "k-A": ("A", 1, "Definition 1"),
+        "k-A--2": ("A--2", 1, "Literal suffix"),
+        "k-A--3": ("A", 2, "Definition 2"),
+        "k-A--4": ("A", 3, "Definition 3"),
+    }
+    index = json.loads((tmp_path / "strongsgreek/index.json").read_text(encoding="utf-8"))
+    complete = json.loads((tmp_path / "strongsgreek.json").read_text(encoding="utf-8"))
+    assert record["entry_count"] == len(expected)
+    assert len({item["id"].casefold() for item in index["entries"]}) == len(expected)
+    assert [item["id"] for item in complete["entries"]] == [item["id"] for item in index["entries"]]
+    for document in complete["entries"]:
+        assert (document["key"], document["occurrence"], document["text"]) == expected[
+            document["id"]
+        ]
+        standalone = json.loads(
+            (tmp_path / f"strongsgreek/{document['id']}.json").read_text(encoding="utf-8")
+        )
+        assert standalone == document
+
+
+@pytest.mark.parametrize("keys", [("3056", "03056"), ("a/b", "YS9i"), ("ALPHA", "alpha")])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_distinct_key_collisions_keep_each_repeated_definition(
+    tmp_path, project_root, greek_dictionary_module, keys, reverse
+) -> None:
+    first, second = reversed(keys) if reverse else keys
+    record, _ = write(
+        tmp_path,
+        project_root,
+        greek_dictionary_module,
+        [
+            {"key": first, "plain": "First key, first definition"},
+            {"key": second, "plain": "Second key, first definition"},
+            {"key": first, "plain": "First key, second definition"},
+            {"key": second, "plain": "Second key, second definition"},
+        ],
+    )
+    first_id = canonical_strong(first, "G") or encoded_entry_id(first)
+    second_id = "h-" + hashlib.sha256(second.encode("utf-8")).hexdigest()
+    expected = {
+        first_id: (first, 1, "First key, first definition"),
+        second_id: (second, 1, "Second key, first definition"),
+        first_id + "--2": (first, 2, "First key, second definition"),
+        second_id + "--2": (second, 2, "Second key, second definition"),
+    }
+    complete = json.loads((tmp_path / "strongsgreek.json").read_text(encoding="utf-8"))
+    assert record["entry_count"] == len(expected)
+    assert {
+        item["id"]: (item["key"], item["occurrence"], item["text"]) for item in complete["entries"]
+    } == expected
+    assert len({item["id"].casefold() for item in complete["entries"]}) == len(expected)
 
 
 def test_whole_dictionary_embeds_entries_in_index_order(
