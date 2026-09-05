@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GetBible Dictionary Metadata v1",
+  "description": "One dictionary's provenance, licence, counts and sizes. bytes is the size of the whole-dictionary document.",
+  "type": "object",
+  "required": [
+    "schema",
+    "id",
+    "module",
+    "name",
+    "language",
+    "version",
+    "license",
+    "driver",
+    "source_type",
+    "entry_count",
+    "unique_key_count",
+    "strong_prefix",
+    "bytes",
+    "index_url",
+    "entry_url_template",
+    "source",
+    "source_module_url",
+    "text_source",
+    "copyright",
+    "copyright_holder",
+    "copyright_contact",
+    "distribution_notes",
+    "about",
+    "conversion_note",
+    "references"
+  ],
+  "properties": {
+    "schema": {
+      "const": "getbible-dictionary-metadata-v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "module": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The source module's own name."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "version": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string"
+    },
+    "driver": {
+      "type": "string"
+    },
+    "source_type": {
+      "type": "string"
+    },
+    "entry_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unique_key_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "strong_prefix": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "G",
+        "H",
+        null
+      ]
+    },
+    "bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "index_url": {
+      "const": "index.json"
+    },
+    "entry_url_template": {
+      "const": "{entry}.json"
+    },
+    "source": {
+      "const": "CrossWire SWORD"
+    },
+    "source_module_url": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The module's own page at its source."
+    },
+    "text_source": {
+      "type": "string"
+    },
+    "copyright": {
+      "type": "string"
+    },
+    "copyright_holder": {
+      "type": "string"
+    },
+    "copyright_contact": {
+      "type": "object",
+      "required": [
+        "name",
+        "email",
+        "address"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "distribution_notes": {
+      "type": "string"
+    },
+    "about": {
+      "type": "string"
+    },
+    "conversion_note": {
+      "type": "string",
+      "minLength": 1
+    },
+    "references": {
+      "type": "object",
+      "description": "Which Bible the module's scripture references were resolved against: the API, the versification, the translations whose shape decided which chapters and verses exist, the translation whose book names ref uses, and the librarian and alias tables that resolved the spellings.",
+      "required": [
+        "api",
+        "versification",
+        "translations",
+        "names",
+        "language",
+        "librarian",
+        "aliases"
+      ],
+      "properties": {
+        "api": {
+          "const": "getbible-v2"
+        },
+        "versification": {
+          "type": "string"
+        },
+        "translations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "names": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "language": {
+          "type": "string"
+        },
+        "librarian": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,6 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dictionaries.getbible.net/schema/v1/dictionary-index.json",
   "title": "GetBible Dictionary Index v1",
   "description": "Every word in one dictionary, sorted by the accent-insensitive lowercase search term. One fetch is enough to search a dictionary in any direction; the word itself is then at entry_url_template with the record's id.",
   "type": "object",
@@ -15,24 +14,65 @@
     "entries"
   ],
   "properties": {
-    "schema": {"const": "getbible-dictionary-index-v1"},
-    "dictionary": {"type": "string", "minLength": 1},
-    "language": {"type": "string", "minLength": 2},
-    "name": {"type": "string", "minLength": 1},
-    "entry_url_template": {"const": "{entry}.json"},
-    "entry_count": {"type": "integer", "minimum": 0},
-    "unique_key_count": {"type": "integer", "minimum": 0},
+    "schema": {
+      "const": "getbible-dictionary-index-v1"
+    },
+    "dictionary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entry_url_template": {
+      "const": "{entry}.json"
+    },
+    "entry_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unique_key_count": {
+      "type": "integer",
+      "minimum": 0
+    },
     "entries": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "key", "search"],
+        "required": [
+          "id",
+          "key",
+          "search"
+        ],
         "properties": {
-          "id": {"type": "string", "minLength": 1},
-          "key": {"type": "string", "minLength": 1},
-          "search": {"type": "string", "minLength": 1},
-          "aliases": {"type": "array", "items": {"type": "string"}, "minItems": 1},
-          "occurrence": {"type": "integer", "minimum": 2}
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "occurrence": {
+            "type": "integer",
+            "minimum": 2
+          }
         },
         "additionalProperties": false
       }

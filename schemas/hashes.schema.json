@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GetBible Hashes v1",
+  "description": "The SHA-256 of every other document in one v1 tree, keyed by path relative to the tree root; also the complete list of the paths the tree contains.",
+  "type": "object",
+  "required": [
+    "schema",
+    "algorithm",
+    "files"
+  ],
+  "properties": {
+    "schema": {
+      "const": "getbible-hashes-v1"
+    },
+    "algorithm": {
+      "const": "sha256"
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    }
+  },
+  "additionalProperties": false
+}

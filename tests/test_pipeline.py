@@ -51,24 +51,52 @@ def test_schemas_are_published_beside_the_data(pipeline, tmp_path) -> None:
         "commentary.json",
         "commentary-book.json",
         "commentary-books.json",
+        "commentary-catalog.json",
         "commentary-chapter.json",
+        "commentary-metadata.json",
+        "build.json",
+        "hashes.json",
     }
 
     dictionary_root = tmp_path / "generated-dictionaries"
     pipeline._publish_schemas(dictionary_root, "dictionaries")
     published = {path.name for path in (dictionary_root / "schema").glob("*.json")}
-    assert published == {"dictionary.json", "dictionary-entry.json", "dictionary-index.json"}
+    assert published == {
+        "dictionary.json",
+        "dictionary-catalog.json",
+        "dictionary-entry.json",
+        "dictionary-index.json",
+        "dictionary-metadata.json",
+        "build.json",
+        "hashes.json",
+    }
 
 
-def test_published_schema_ids_match_their_served_paths(pipeline, tmp_path) -> None:
+def test_published_schemas_refer_to_each_other_by_published_name(pipeline, tmp_path) -> None:
+    """A schema names no host: it refers to a sibling by the file name it is published
+    under, which resolves wherever the schema folder is served."""
     from study_builder.util import read_json
+
+    def references(node):
+        if isinstance(node, dict):
+            yield from ([node["$ref"]] if isinstance(node.get("$ref"), str) else [])
+            for value in node.values():
+                yield from references(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from references(value)
 
     for kind in ("commentaries", "dictionaries"):
         root = tmp_path / kind
         pipeline._publish_schemas(root, kind)
         for path in sorted((root / "schema").glob("*.json")):
-            expected = f"{BASE_URLS[kind].removesuffix('v1/')}schema/v1/{path.name}"
-            assert read_json(path)["$id"] == expected
+            schema = read_json(path)
+            assert "$id" not in schema
+            for reference in references(schema):
+                assert reference.startswith("#/") or (root / "schema" / reference).is_file(), (
+                    path.name,
+                    reference,
+                )
 
 
 def test_offline_pipeline_configures_engine_and_bible_without_network(pipeline) -> None:

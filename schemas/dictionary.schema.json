@@ -1,18 +1,36 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dictionaries.getbible.net/schema/v1/dictionary.json",
   "title": "GetBible Dictionary v1",
   "description": "One complete dictionary in index order. Each member of entries is byte-for-byte the document served at {dictionary}/{entry}.json. This is a bulk document for offline clients; metadata.json publishes its size in bytes.",
   "type": "object",
-  "required": ["schema", "dictionary", "language", "name", "entries"],
+  "required": [
+    "schema",
+    "dictionary",
+    "language",
+    "name",
+    "entries"
+  ],
   "properties": {
-    "schema": {"const": "getbible-dictionary-v1"},
-    "dictionary": {"type": "string", "minLength": 1},
-    "language": {"type": "string", "minLength": 2},
-    "name": {"type": "string", "minLength": 1},
+    "schema": {
+      "const": "getbible-dictionary-v1"
+    },
+    "dictionary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
     "entries": {
       "type": "array",
-      "items": {"$ref": "https://dictionaries.getbible.net/schema/v1/dictionary-entry.json"}
+      "items": {
+        "$ref": "dictionary-entry.json"
+      }
     }
   },
   "additionalProperties": false

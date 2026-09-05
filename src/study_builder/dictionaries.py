@@ -152,6 +152,7 @@ class DictionaryWriter:
         self.books = books
         self.max_document_bytes = max_document_bytes
         self.schema = read_json(schemas_dir / "dictionary-entry.schema.json")
+        self.metadata_schema = read_json(schemas_dir / "dictionary-metadata.schema.json")
         self.references = references
         self.source_type = ""
 
@@ -217,6 +218,7 @@ class DictionaryWriter:
             module, module_id, prefix, len(staged), unique_keys, complete_bytes
         )
         metadata["references"] = self.references.describe()
+        validate(metadata, self.metadata_schema)
         write_json(module_root / "metadata.json", metadata)
         record = {
             "id": module_id,

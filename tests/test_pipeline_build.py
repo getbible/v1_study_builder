@@ -152,11 +152,51 @@ def test_hashes_manifest_covers_every_other_document(built) -> None:
     assert all(len(digest) == 64 for digest in manifest["files"].values())
 
 
-def test_schemas_are_served_beside_the_data(built) -> None:
+def test_schemas_are_published_beside_the_data(built) -> None:
     _, dist = built
     assert (dist / "commentaries/v1/schema/commentary-chapter.json").is_file()
     assert (dist / "dictionaries/v1/schema/dictionary-entry.json").is_file()
     assert not (dist / "commentaries/v1/schema/dictionary-entry.json").exists()
+
+
+@pytest.mark.parametrize("kind", ["commentaries", "dictionaries"])
+def test_every_tree_level_document_matches_its_published_schema(built, kind) -> None:
+    from jsonschema import validate
+
+    _, dist = built
+    root = dist / kind / "v1"
+    prefix = "commentary" if kind == "commentaries" else "dictionary"
+    module = "clarke" if kind == "commentaries" else "easton"
+    for document, schema in (
+        (f"{kind}.json", f"{prefix}-catalog"),
+        ("build.json", "build"),
+        ("hashes.json", "hashes"),
+        (f"{module}/metadata.json", f"{prefix}-metadata"),
+    ):
+        validate(
+            json.loads((root / document).read_text(encoding="utf-8")),
+            json.loads((root / "schema" / f"{schema}.json").read_text(encoding="utf-8")),
+        )
+
+
+@pytest.mark.parametrize("kind", ["commentaries", "dictionaries"])
+def test_each_tree_describes_itself_without_naming_a_host(built, kind) -> None:
+    _, dist = built
+    root = dist / kind / "v1"
+    text = (root / "openapi.json").read_text(encoding="utf-8")
+    document = json.loads(text)
+    assert document["openapi"] == "3.1.0" and "servers" not in document
+    assert "getbible.net" not in text
+    module = "clarke" if kind == "commentaries" else "easton"
+    parameter = "commentary" if kind == "commentaries" else "dictionary"
+    metadata = document["paths"][f"/v1/{{{parameter}}}/metadata.json"]["get"]
+    assert metadata["parameters"][0]["schema"]["enum"] == [module]
+    # Every schema the description embeds is also published beside the data.
+    for name in document["components"]["schemas"]:
+        assert (root / "schema" / f"{name}.json").is_file(), name
+    # The description is one of the documents hashes.json vouches for.
+    manifest = json.loads((root / "hashes.json").read_text(encoding="utf-8"))
+    assert "openapi.json" in manifest["files"]
 
 
 def test_no_document_publishes_markup(built) -> None:

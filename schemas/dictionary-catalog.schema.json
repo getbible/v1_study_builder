@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GetBible Dictionary Catalog v1",
+  "description": "Every dictionary in one v1 tree, with the path template of each of its documents relative to the tree root. The catalog and build.json are the only documents that carry the build time.",
+  "type": "object",
+  "required": [
+    "schema",
+    "version",
+    "generated_at",
+    "base_url",
+    "metadata_url_template",
+    "index_url_template",
+    "dictionary_url_template",
+    "entry_url_template",
+    "module_count",
+    "dictionaries"
+  ],
+  "properties": {
+    "schema": {
+      "const": "getbible-dictionaries-catalog-v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "base_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata_url_template": {
+      "const": "{dictionary}/metadata.json"
+    },
+    "index_url_template": {
+      "const": "{dictionary}/index.json"
+    },
+    "dictionary_url_template": {
+      "const": "{dictionary}.json"
+    },
+    "entry_url_template": {
+      "const": "{dictionary}/{entry}.json"
+    },
+    "module_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "dictionaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "description": "One dictionary: its id is the first path segment of all of its documents, strong_prefix is G or H for a Strong's lexicon and null otherwise, and bytes is the size of its whole-dictionary document.",
+        "required": [
+          "id",
+          "name",
+          "language",
+          "license",
+          "entry_count",
+          "unique_key_count",
+          "strong_prefix",
+          "bytes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "language": {
+            "type": "string",
+            "minLength": 2
+          },
+          "license": {
+            "type": "string"
+          },
+          "entry_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unique_key_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "strong_prefix": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "G",
+              "H",
+              null
+            ]
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
