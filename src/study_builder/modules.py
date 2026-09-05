@@ -12,10 +12,15 @@ from study_builder.util import reset_directory, slug
 
 
 class ModuleInstaller:
-    def __init__(self, cache: Path, http: HttpClient, refresh: bool = False) -> None:
+    def __init__(
+        self, cache: Path, http: HttpClient, refresh: bool = False, offline: bool = False
+    ) -> None:
+        if offline and refresh:
+            raise ValueError("Offline mode and package refresh cannot be combined")
         self.cache = cache
         self.http = http
         self.refresh = refresh
+        self.offline = offline
 
     def install(self, module: ModuleDescriptor) -> Path:
         archives = self.cache / "archives"
@@ -23,6 +28,10 @@ class ModuleInstaller:
         archive = archives / f"{slug(module.name)}.zip"
         installation = installations / slug(module.name)
         if self.refresh or not archive.exists():
+            if self.offline:
+                raise RuntimeError(
+                    f"Offline mode requested but no cached package exists for {module.name}"
+                )
             if "{module}" not in PACKAGE_URL:
                 raise ValueError("STUDY_BUILDER_PACKAGE_URL must contain {module}")
             url = PACKAGE_URL.format(module=urllib.parse.quote(module.name, safe=""))

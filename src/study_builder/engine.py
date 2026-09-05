@@ -97,10 +97,12 @@ class GetBibleSwordManager:
         manifest_path: Path,
         work_dir: Path,
         http: HttpClient | None = None,
+        offline: bool = False,
     ) -> None:
         self.manifest = EngineManifest.load(manifest_path)
         self.work_dir = work_dir
         self.http = http or HttpClient()
+        self.offline = offline
 
     @property
     def executable(self) -> Path:
@@ -125,6 +127,8 @@ class GetBibleSwordManager:
         return executable
 
     def install(self, force: bool = False) -> Path:
+        if self.offline and force:
+            raise ValueError("Offline mode and forced engine installation cannot be combined")
         destination = self.executable
         if destination.is_file() and not force:
             self.verify(destination)
@@ -136,7 +140,16 @@ class GetBibleSwordManager:
 
         downloads = self.work_dir / "downloads" / "getbiblesword" / self.manifest.version
         archive_path = downloads / asset.name
-        self.http.download(asset_url, archive_path, asset.sha256)
+        if self.offline:
+            if not archive_path.is_file():
+                raise RuntimeError(
+                    "Offline mode requested but no cached getbiblesword release exists"
+                )
+            with archive_path.open("rb") as archive:
+                if hashlib.file_digest(archive, "sha256").hexdigest() != asset.sha256:
+                    raise RuntimeError("Checksum mismatch for cached getbiblesword release")
+        else:
+            self.http.download(asset_url, archive_path, asset.sha256)
         self._extract_binary(archive_path, destination)
         try:
             self.verify(destination)

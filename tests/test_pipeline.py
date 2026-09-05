@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from study_builder.pipeline import (
@@ -67,3 +69,20 @@ def test_published_schema_ids_match_their_served_paths(pipeline, tmp_path) -> No
         for path in sorted((root / "schema").glob("*.json")):
             expected = f"{BASE_URLS[kind].removesuffix('v1/')}schema/v1/{path.name}"
             assert read_json(path)["$id"] == expected
+
+
+def test_offline_pipeline_configures_engine_and_bible_without_network(pipeline) -> None:
+    offline = BuildPipeline(replace(pipeline.config, offline=True))
+    assert offline.engine.offline
+    assert offline.bible.offline
+
+
+def test_pipeline_rejects_offline_refresh_before_loading_catalog(pipeline, monkeypatch) -> None:
+    pipeline.config = replace(pipeline.config, offline=True, refresh=True)
+
+    def unexpected_catalog():
+        pytest.fail("The catalog must not be loaded with contradictory download settings")
+
+    monkeypatch.setattr(pipeline, "_catalog", unexpected_catalog)
+    with pytest.raises(ValueError, match="--offline and --refresh cannot be combined"):
+        pipeline.run()

@@ -7,6 +7,7 @@ import json
 import tarfile
 import urllib.error
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
@@ -88,3 +89,42 @@ def test_install_avoids_rate_limited_github_api(
 
     assert installed.read_bytes() == b"test getbiblesword executable"
     assert http.urls == [manager.manifest.asset_url(manager.manifest.platform_asset())]
+
+    # Offline builds can restore a removed executable from the verified archive.
+    installed.unlink()
+    manager.offline = True
+    assert manager.ensure().read_bytes() == b"test getbiblesword executable"
+    assert http.urls == [manager.manifest.asset_url(manager.manifest.platform_asset())]
+
+
+def test_offline_engine_rejects_missing_release_without_downloading(project_root, tmp_path) -> None:
+    http = Mock()
+    manager = GetBibleSwordManager(
+        project_root / "conf/getbiblesword.json", tmp_path, http=http, offline=True
+    )
+
+    with pytest.raises(RuntimeError, match="no cached getbiblesword release exists"):
+        manager.ensure()
+
+    http.download.assert_not_called()
+
+
+def test_offline_engine_verifies_cached_release_before_extracting(
+    project_root, tmp_path, monkeypatch
+) -> None:
+    http = Mock()
+    manager = GetBibleSwordManager(
+        project_root / "conf/getbiblesword.json", tmp_path, http=http, offline=True
+    )
+    asset = manager.manifest.platform_asset()
+    archive = tmp_path / "downloads/getbiblesword" / manager.manifest.version / asset.name
+    archive.parent.mkdir(parents=True)
+    archive.write_bytes(b"corrupt cached archive")
+    extract = Mock()
+    monkeypatch.setattr(manager, "_extract_binary", extract)
+
+    with pytest.raises(RuntimeError, match="Checksum mismatch for cached"):
+        manager.ensure()
+
+    extract.assert_not_called()
+    http.download.assert_not_called()

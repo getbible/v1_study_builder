@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import ssl
 import time
 import urllib.error
@@ -57,8 +58,18 @@ class HttpClient:
                     payload = response.read(MAX_MEMORY_RESPONSE + 1)
                     if len(payload) > MAX_MEMORY_RESPONSE:
                         raise RuntimeError(f"Response exceeded the memory limit: {url}")
+                    if response.headers.get("Content-Length") and len(payload) != content_length:
+                        raise OSError(
+                            f"Truncated response for {url}: expected {content_length} bytes, "
+                            f"received {len(payload)}"
+                        )
                     return payload
-            except (urllib.error.URLError, TimeoutError, OSError) as error:
+            except (
+                urllib.error.URLError,
+                TimeoutError,
+                OSError,
+                http.client.HTTPException,
+            ) as error:
                 last_error = error
                 if attempt + 1 < self.retries:
                     time.sleep(2**attempt)
@@ -92,11 +103,22 @@ class HttpClient:
                             raise RuntimeError(f"Download exceeded the configured limit: {url}")
                         digest.update(block)
                         output.write(block)
+                    if response.headers.get("Content-Length") and size != content_length:
+                        raise OSError(
+                            f"Truncated download for {url}: expected {content_length} bytes, "
+                            f"received {size}"
+                        )
                 if expected_sha256 and digest.hexdigest() != expected_sha256.casefold():
                     raise RuntimeError(f"Checksum mismatch for {url}")
                 partial.replace(target)
                 return target
-            except (urllib.error.URLError, TimeoutError, OSError, RuntimeError) as error:
+            except (
+                urllib.error.URLError,
+                TimeoutError,
+                OSError,
+                RuntimeError,
+                http.client.HTTPException,
+            ) as error:
                 partial.unlink(missing_ok=True)
                 last_error = error
                 if attempt + 1 < self.retries:
