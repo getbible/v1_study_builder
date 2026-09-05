@@ -224,3 +224,36 @@ def test_a_translation_with_an_absurd_verse_number_is_refused(tmp_path) -> None:
     )
     with pytest.raises(BibleApiError, match="verse number"):
         BibleApi(tree, cache_dir=tmp_path / "cache").canon("klv")
+
+
+@pytest.mark.parametrize("number", [None, True, 0, 201, "1"])
+def test_an_invalid_cached_book_number_is_rejected_offline_and_refreshed_online(
+    tmp_path, number
+) -> None:
+    tree = write_bible_tree(tmp_path / "v2", {"klv": TRANSLATIONS["klv"]})
+    cache = tmp_path / "cache"
+    BibleApi(tree, cache_dir=cache).canon("klv")
+    shape = cache / "shape" / "klv.json"
+    record = json.loads(shape.read_text(encoding="utf-8"))
+    record["books"][0]["number"] = number
+    shape.write_text(json.dumps(record), encoding="utf-8")
+
+    offline = BibleApi("https://unreachable.test/v2", cache_dir=cache, offline=True)
+    with pytest.raises(BibleApiError, match="Offline"):
+        offline.canon("klv")
+    assert BibleApi(tree, cache_dir=cache).canon("klv")[1].chapter_count == 50
+
+
+def test_a_cached_duplicate_book_cannot_override_the_validated_shape(tmp_path) -> None:
+    tree = write_bible_tree(tmp_path / "v2", {"klv": TRANSLATIONS["klv"]})
+    cache = tmp_path / "cache"
+    BibleApi(tree, cache_dir=cache).canon("klv")
+    shape = cache / "shape" / "klv.json"
+    record = json.loads(shape.read_text(encoding="utf-8"))
+    record["books"].append({**record["books"][0], "verses": [1]})
+    shape.write_text(json.dumps(record), encoding="utf-8")
+
+    offline = BibleApi("https://unreachable.test/v2", cache_dir=cache, offline=True)
+    with pytest.raises(BibleApiError, match="Offline"):
+        offline.canon("klv")
+    assert BibleApi(tree, cache_dir=cache).canon("klv")[1].chapter_count == 50

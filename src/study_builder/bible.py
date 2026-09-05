@@ -515,9 +515,13 @@ def _read_canon_cache(path: Path | None, abbreviation: str) -> dict[str, Any] | 
         return None
     if not record["books"]:
         return None
+    numbers: set[int] = set()
     try:
         for item in record["books"]:
-            _book_number(item["number"], "cached Bible shape")
+            number = _book_number(item["number"], "cached Bible shape")
+            if number in numbers:
+                return None
+            numbers.add(number)
             name = item["name"]
             counts = item["verses"]
             if (
@@ -534,7 +538,7 @@ def _read_canon_cache(path: Path | None, abbreviation: str) -> dict[str, Any] | 
                 )
             ):
                 return None
-    except (KeyError, TypeError):
+    except (BibleApiError, KeyError, TypeError):
         return None
     return record
 
