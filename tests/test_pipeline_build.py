@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
@@ -80,7 +82,7 @@ class StubExporter:
 
 
 @pytest.fixture
-def built(tmp_path, project_root, monkeypatch, bible_tree):
+def configured_pipeline(tmp_path, project_root, monkeypatch, bible_tree):
     monkeypatch.setattr(pipeline_module, "ModuleInstaller", StubInstaller)
     monkeypatch.setattr(pipeline_module, "SwordExporter", StubExporter)
     monkeypatch.setattr(BuildPipeline, "_catalog", lambda self: [COMMENTARY, DICTIONARY])
@@ -99,8 +101,13 @@ def built(tmp_path, project_root, monkeypatch, bible_tree):
         aliases_dir=project_root / "conf/book_aliases",
         bible_api=str(bible_tree),
     )
-    report = BuildPipeline(config).run()
-    return report, tmp_path / "dist"
+    return BuildPipeline(config)
+
+
+@pytest.fixture
+def built(configured_pipeline):
+    report = configured_pipeline.run()
+    return report, configured_pipeline.config.dist_dir
 
 
 def test_build_publishes_both_resources_under_v1(built) -> None:
@@ -156,3 +163,31 @@ def test_no_document_publishes_markup(built) -> None:
     _, dist = built
     for path in dist.rglob("*.json"):
         assert '"html"' not in path.read_text(encoding="utf-8"), path
+
+
+@pytest.mark.parametrize("failure", ["prepare", "commit"])
+def test_all_targets_are_prepared_and_committed_before_any_push(
+    configured_pipeline, monkeypatch, failure
+) -> None:
+    pipeline = configured_pipeline
+    pipeline.config = replace(pipeline.config, pull=True, push=True)
+    repositories = {}
+    for kind in ("commentaries", "dictionaries"):
+        repository = Mock()
+        repository.path = pipeline.config.work_dir / "repos" / kind
+        previous = repository.path / "v1/previous.json"
+        previous.parent.mkdir(parents=True)
+        previous.write_text('{"previous":true}', encoding="utf-8")
+        repository.commit.return_value = "test-commit"
+        repositories[kind] = repository
+    getattr(repositories["dictionaries"], failure).side_effect = RuntimeError("target failure")
+    monkeypatch.setattr(pipeline, "_repositories", lambda: repositories)
+
+    with pytest.raises(RuntimeError, match="target failure"):
+        pipeline.run()
+
+    for repository in repositories.values():
+        repository.push.assert_not_called()
+        if failure == "prepare":
+            repository.commit.assert_not_called()
+            assert (repository.path / "v1/previous.json").read_text() == '{"previous":true}'

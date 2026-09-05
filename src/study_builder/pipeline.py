@@ -92,7 +92,10 @@ class BuildPipeline:
         self.policy = ModulePolicy(config.policy_path)
         self.books = BookRegistry(config.books_path)
         self.engine = GetBibleSwordManager(
-            config.engine_manifest_path, config.work_dir, http=self.http
+            config.engine_manifest_path,
+            config.work_dir,
+            http=self.http,
+            offline=config.offline,
         )
         self.bible = BibleApi(
             config.bible_api,
@@ -137,6 +140,8 @@ class BuildPipeline:
         }
 
     def run(self) -> BuildReport:
+        if self.config.offline and self.config.refresh:
+            raise ValueError("--offline and --refresh cannot be combined")
         if self.config.push and self.config.modules:
             raise ValueError(
                 "Publishing a partial --module build is disabled to protect the public API"
@@ -186,7 +191,10 @@ class BuildPipeline:
             generated_roots[kind] = path
 
         installer = ModuleInstaller(
-            self.config.work_dir / "modules", self.http, refresh=self.config.refresh
+            self.config.work_dir / "modules",
+            self.http,
+            refresh=self.config.refresh,
+            offline=self.config.offline,
         )
         executable = self.engine.ensure(self.config.engine_path)
         exporter = SwordExporter(
@@ -313,14 +321,18 @@ class BuildPipeline:
         if self.config.pull or self.config.push:
             repositories = self._repositories()
             sign = sign_commits_from_environment()
+            # Validate every checkout before replacing either API, and complete
+            # every local commit before publishing the first resource.
+            for kind in resources:
+                repositories[kind].prepare(self.config.pull)
             for kind in resources:
                 repository = repositories[kind]
-                repository.prepare(self.config.pull)
                 replace_tree(generated_roots[kind], repository.path / "v1")
                 commit = repository.commit(f"Build {kind} API v1 ({generated_at})", sign=sign)
                 report.commits[kind] = commit
-                if self.config.push:
-                    repository.push()
+            if self.config.push:
+                for kind in resources:
+                    repositories[kind].push()
 
         report.completed_at = utc_now()
         self._write_report(report)

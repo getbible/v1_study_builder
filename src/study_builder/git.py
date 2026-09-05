@@ -46,6 +46,11 @@ class GitRepository:
             raise RuntimeError(
                 f"Unexpected origin for {self.path}: {remote!r}, expected {self.url!r}"
             )
+        if self._run("status", "--porcelain", "--untracked-files=all", capture=True):
+            raise RuntimeError(
+                f"Target repository has uncommitted changes: {self.path}; "
+                "commit or remove them before replacing generated output"
+            )
         self._run("checkout", self.branch)
         if pull:
             self._run("pull", "--ff-only", "origin", self.branch)
