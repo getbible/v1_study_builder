@@ -10,15 +10,15 @@ import tempfile
 from collections.abc import Collection, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import IO, Any
+from typing import Any
 
 LOG = logging.getLogger(__name__)
 
 _SAFE_SLUG = re.compile(r"[^a-z0-9._-]+")
 
 # A Git remote rejects a blob above 100 MB outright and warns above 50 MB. The
-# builder holds itself below both, so an oversized document is caught here — in
-# the build, naming the file — rather than hours later in a rejected push.
+# builder warns at the first and stops below the second, catching an oversized
+# document in the build, naming the file, rather than hours later in a rejected push.
 DOCUMENT_WARNING_BYTES = 50 * 1024 * 1024
 DOCUMENT_CEILING_BYTES = 95 * 1024 * 1024
 
@@ -39,7 +39,8 @@ def slug(value: str) -> str:
 
 
 def stable_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=False) + "\n"
+    """Serialize without padding: references must not multiply indentation at each level."""
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=False) + "\n"
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -78,17 +79,6 @@ def hash_tree(root: Path, *, exclude: Collection[str] = ()) -> dict[str, str]:
     return hashes
 
 
-def _write_indented(handle: IO[str], source: Path, prefix: str) -> None:
-    first = True
-    with source.open(encoding="utf-8") as reader:
-        for raw in reader:
-            line = raw.rstrip("\n")
-            if not first:
-                handle.write("\n")
-            first = False
-            handle.write(prefix + line if line else "")
-
-
 def megabytes(size: int) -> str:
     return f"{size / 1024 / 1024:.2f} MB"
 
@@ -125,22 +115,28 @@ def write_composed_json(
     path.parent.mkdir(parents=True, exist_ok=True)
     if member in header:
         raise ValueError(f"Composed member {member!r} is already present in the envelope")
-    with tempfile.NamedTemporaryFile(
-        "w", encoding="utf-8", dir=path.parent, delete=False, prefix=f".{path.name}."
-    ) as handle:
-        opening = stable_json(header).rstrip()
-        handle.write(opening[:-1].rstrip())
-        if header:
-            handle.write(",")
-        handle.write(f'\n  "{member}": [')
-        for index, source in enumerate(sources):
-            handle.write(",\n" if index else "\n")
-            _write_indented(handle, source, "    ")
-        if sources:
-            handle.write("\n  ")
-        handle.write("]\n}\n")
-        temporary = Path(handle.name)
-    os.replace(temporary, path)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "wb", dir=path.parent, delete=False, prefix=f".{path.name}."
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(stable_json(header).rstrip()[:-1].encode("utf-8"))
+            if header:
+                handle.write(b",")
+            handle.write(json.dumps(member, ensure_ascii=False).encode("utf-8") + b":[")
+            for index, source in enumerate(sources):
+                if index:
+                    handle.write(b",")
+                # Copy fixed-size blocks, not lines: compact books may occupy a
+                # single very large line. Preserve every source byte, including LF.
+                with source.open("rb") as reader:
+                    shutil.copyfileobj(reader, handle, length=1024 * 1024)
+            handle.write(b"]}\n")
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
     return path.stat().st_size
 
 
