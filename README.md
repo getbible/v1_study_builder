@@ -3,17 +3,20 @@
 [![Study APIs](https://github.com/getbible/v1_study_builder/actions/workflows/build.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/build.yml) [![Test Builder](https://github.com/getbible/v1_study_builder/actions/workflows/ci.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/ci.yml) [![Get Bible Sword](https://github.com/getbible/v1_study_builder/actions/workflows/binary-smoke.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/binary-smoke.yml) [![Crosswire Corpus](https://github.com/getbible/v1_study_builder/actions/workflows/integration.yml/badge.svg)](https://github.com/getbible/v1_study_builder/actions/workflows/integration.yml)
 
 `v1_study_builder` converts policy-approved CrossWire SWORD commentary and
-dictionary modules into two independently deployable static JSON APIs:
+dictionary modules into two trees of static JSON documents:
 
-- `https://commentaries.getbible.net/v1/` from `getbible/commentaries`
-- `https://dictionaries.getbible.net/v1/` from `getbible/dictionaries`
+- `commentaries/v1/`, published to `getbible/commentaries`
+- `dictionaries/v1/`, published to `getbible/dictionaries`
 
-The Bible API v3 builder remains unchanged. Study Builder deliberately uses the
-same book numbers, chapters, verses, and Strong's keys so a client can move from a
-Bible response to commentary or dictionary data with a direct path lookup.
+That is the whole job: build the static files, and build them well. Where and how
+the trees are served is not this repository's concern. Each tree carries its own
+`openapi.json`, which tells whoever serves or consumes it what every document holds.
 
-Every document is plain text. Nothing in either API publishes HTML, so a consuming
-application never has to sanitize a response before rendering it.
+Study Builder uses the same book numbers, chapters, verses, and Strong's keys as the
+Bible API, so a client can move from a Bible response to commentary or dictionary
+data with a direct path lookup. Every document is plain text. Nothing in either
+tree carries HTML, so a consuming application never has to sanitize a document
+before rendering it.
 
 ## Repository boundaries
 
@@ -21,10 +24,10 @@ application never has to sanitize a response before rendering it.
 | --- | --- | --- |
 | `getbible/getbiblesword` | Official SWORD C++ extraction and deterministic NDJSON | Released Linux executable |
 | `getbible/v1_study_builder` | Download policy, strict contract validation, normalization, schemas, and publication | Python 3.12 at build time |
-| `getbible/librarian` (`getbible` on PyPI) | Scripture reference engine: book-name tables and parser behind `query.getbible.net` | Python library at build time |
-| `api.getbible.net/v2` | The Bible itself: which books, chapters, and verses each translation has, and what a language calls the books | Read at build time, cached |
-| `getbible/commentaries` | Generated commentary JSON under `v1/` | Nginx/CDN only |
-| `getbible/dictionaries` | Generated dictionary JSON under `v1/` | Nginx/CDN only |
+| `getbible/librarian` (`getbible` on PyPI) | Scripture reference engine: book-name tables and the reference parser | Python library at build time |
+| GetBible Bible API v2 | The Bible itself: which books, chapters, and verses each translation has, and what a language calls the books | Read at build time, cached |
+| `getbible/commentaries` | Generated commentary JSON under `v1/` | Generated output |
+| `getbible/dictionaries` | Generated dictionary JSON under `v1/` | Generated output |
 
 Study Builder does not contain C++, link `libsword`, use a Python SWORD binding, or
 parse a module's binary driver format. `getbiblesword` is a separately versioned
@@ -63,7 +66,7 @@ An audited local executable can be selected with `--engine /absolute/path` or
 
 Every scripture reference the builder publishes is a coordinate in the Bible API, so
 whether a coordinate exists is decided by the API, not by a table in this repository.
-Before a module is written, the builder reads from `https://api.getbible.net/v2`:
+Before a module is written, the builder reads from the Bible API v2:
 
 1. `translations.json`, to know each translation's language and versification;
 2. `{translation}/books.json`, for the numbered book names of the translations it uses;
@@ -113,35 +116,53 @@ extractor error, or classification mismatch stops the complete build before
 publication.
 
 Generated JSON uses compact serialization to keep reference-heavy modules within
-the unchanged 95 MiB document ceiling. Composed documents copy their nested
-documents byte-for-byte without adding indentation. Paths, fields, values, and
-array order are unchanged; rebuilding an older, indented tree changes its file
-bytes, measured sizes, and SHA-256 hashes once. The formatted examples below are
-for readability.
+the 95 MiB document ceiling. Composed documents copy their nested documents
+byte-for-byte without adding indentation. The formatted examples below are for
+readability.
 
-## Commentary API
+## What a build guarantees
+
+Every consumer of the trees, and the OpenAPI description, rely on these properties.
+Keep them when changing the builder:
+
+1. **Output is byte-stable.** A module that has not changed rebuilds to an identical
+   file. Content documents carry no timestamp; only `build.json` and the catalog do,
+   so an unchanged corpus produces an unchanged tree.
+2. **`hashes.json` describes the whole tree.** It holds a SHA-256 for every other
+   document, so it is both the integrity manifest and the list of paths the builder
+   owns.
+3. **The builder owns only version directories.** Anything else in a publication
+   repository is the repository's own and is never touched.
+4. **Every document is plain-text JSON**, validated against its published schema
+   before it is written.
+5. **No document exceeds `--max-document-bytes`** (95 MiB by default, just under the
+   100 MB a Git remote refuses). The build fails and names the file rather than
+   producing a tree that is rejected at push time, hours later. Set it to `0` to
+   disable the check.
+
+## Commentary tree
+
+Relative to `commentaries/v1/`:
 
 ```text
-GET https://commentaries.getbible.net/v1/commentaries.json
-GET https://commentaries.getbible.net/v1/{commentary}.json
-GET https://commentaries.getbible.net/v1/{commentary}/metadata.json
-GET https://commentaries.getbible.net/v1/{commentary}/books.json
-GET https://commentaries.getbible.net/v1/{commentary}/{book}.json
-GET https://commentaries.getbible.net/v1/{commentary}/{book}/{chapter}.json
+commentaries.json                      catalog: every commentary, with counts, sizes, and path templates
+build.json                             which builder, extractor, and Bible API produced the tree, and when
+hashes.json                            SHA-256 of every other document
+openapi.json                           the OpenAPI description of the tree
+schema/{document}.json                 the JSON Schema of every document type
+{commentary}.json                      the whole commentary
+{commentary}/metadata.json             provenance, licence, counts, and sizes
+{commentary}/books.json                the books and chapters the commentary covers
+{commentary}/{book}.json               every chapter of one book
+{commentary}/{book}/{chapter}.json     one chapter
 ```
 
-`book` is the GetBible API v3 numeric identifier: Genesis is `1`, Daniel `27`,
+`book` is the GetBible numeric identifier: Genesis is `1`, Daniel `27`,
 Matthew `40`, and Revelation `66`. Deuterocanonical books continue to `83`.
 
 The three content levels are self-similar. A chapter document is one member of a
 book document, which is one member of a whole-commentary document, embedded
-byte-for-byte. One client parser therefore handles all three:
-
-```text
-{commentary}/{book}/{chapter}.json    one chapter, the high-volume endpoint
-{commentary}/{book}.json             every chapter of that book
-{commentary}.json                    every book of that commentary
-```
+byte-for-byte. One parser therefore handles all three:
 
 ```json
 {
@@ -187,17 +208,10 @@ covers. When it covers more than one verse, `verses` lists every verse it applie
 ```
 
 Resolving a verse is one rule: **an entry covers `verses` when that member is present,
-and `verse` alone when it is not.**
-
-```js
-const forVerse = (chapter, n) =>
-  chapter.entries.find(e => (e.verses ?? [e.verse]).includes(n))
-```
-
-Nothing is dropped by this — every verse the source commented on still resolves to its
-comment. Grouping stops at the chapter boundary, because a chapter document is the
-addressable unit and has to stand alone, so a comment spanning a chapter break is
-published in both chapters.
+and `verse` alone when it is not.** Nothing is dropped by this — every verse the
+source commented on still resolves to its comment. Grouping stops at the chapter
+boundary, because a chapter document has to stand alone, so a comment spanning a
+chapter break is published in both chapters.
 
 An entry carries no `name` and no `anchor` object. Both only restated values already
 present on the entry or its chapter: `name` is the book name with `chapter:verse`, and
@@ -210,7 +224,7 @@ is verse `0`, and appears as the first entry of its own chapter document.
 
 `books.json` reports which books and chapters a commentary covers, and
 `metadata.json` reports its licence, counts, and the byte size of the
-whole-commentary document so a client can decide before requesting it.
+whole-commentary document, so a client can decide before reading it.
 
 `metadata.json` also carries a `storage` block, which is the build's own measurement
 of this module rather than anything a client needs:
@@ -230,42 +244,39 @@ of this module rather than anything a client needs:
 
 `repetition_ratio` is how many times the average byte of source text was repeated
 across the verse range it was attached to — the multiplier the collapse removes. The
-three `*_bytes` members are what each level of the API costs on disk.
+three `*_bytes` members are what each level of the tree costs on disk.
 
-No generated document may exceed `--max-document-bytes` (default 95 MiB, just under the
-100 MB a Git remote refuses). The build fails and names the file rather than producing
-a tree that is rejected at push time, hours later. Set it to `0` to disable the check.
+## Dictionary tree
 
-## Dictionary API
+Relative to `dictionaries/v1/`:
 
 ```text
-GET https://dictionaries.getbible.net/v1/dictionaries.json
-GET https://dictionaries.getbible.net/v1/{dictionary}.json
-GET https://dictionaries.getbible.net/v1/{dictionary}/metadata.json
-GET https://dictionaries.getbible.net/v1/{dictionary}/index.json
-GET https://dictionaries.getbible.net/v1/{dictionary}/{entry}.json
+dictionaries.json                      catalog: every dictionary, with counts, sizes, and path templates
+build.json                             which builder, extractor, and Bible API produced the tree, and when
+hashes.json                            SHA-256 of every other document
+openapi.json                           the OpenAPI description of the tree
+schema/{document}.json                 the JSON Schema of every document type
+{dictionary}.json                      the whole dictionary, in index order
+{dictionary}/metadata.json             provenance, licence, counts, and sizes
+{dictionary}/index.json                every word once, with the id of its document
+{dictionary}/{entry}.json              one word
 ```
 
-Searching a dictionary takes two requests. `index.json` lists every word once,
-sorted by an accent-insensitive lowercase `search` term, so a client can fetch it
-once and then search, prefix-match, or binary-search entirely in memory:
+`index.json` lists every word once, sorted by an accent-insensitive lowercase
+`search` term, so a client can read it once and then search, prefix-match, or
+binary-search entirely in memory:
 
 ```json
 {"id": "k-KADESH", "key": "KADESH", "search": "kadesh"}
 ```
 
-The record's `id` is the path of the word itself — `{entry}.json` — so a hit in
-the index resolves to exactly one document with no further lookup.
+The record's `id` is the document name of the word itself — `{entry}.json` — so a
+hit in the index resolves to exactly one document with no further lookup.
 
-Strong's paths match Bible API v3 tokens directly:
-
-```text
-G3056 -> https://dictionaries.getbible.net/v1/strongsgreek/G3056.json
-H0430 -> https://dictionaries.getbible.net/v1/strongshebrew/H0430.json
-```
-
-Greek keys use `G` plus the unpadded number; Hebrew keys use `H0` plus the
-unpadded number. Other dictionary keys receive deterministic, path-safe IDs.
+Strong's ids are the Bible API's own tokens: `strongsgreek/G3056.json` and
+`strongshebrew/H0430.json`. Greek keys use `G` plus the unpadded number; Hebrew
+keys use `H0` plus the unpadded number. Other dictionary keys receive
+deterministic, path-safe ids.
 
 Each word document carries the dictionary's own link graph, so a client can
 navigate in either direction without rebuilding an index:
@@ -288,14 +299,14 @@ navigate in either direction without rebuilding an index:
 `see_also` lists the words this entry points at and `backlinks` the words that
 point back. Only targets that resolve to a real key in the same dictionary are
 published. Scripture references stay in `references`, in the same shape the
-commentary API uses; see [Scripture references](#scripture-references) for how
+commentary tree uses; see [Scripture references](#scripture-references) for how
 citations written in the text itself are published.
 
 Some SWORD dictionaries legitimately contain more than one definition for the
-same public key. The first definition keeps the canonical direct path, and later
+same public key. The first definition keeps the plain id, and later
 definitions receive deterministic `--2`, `--3`, and subsequent suffixes, skipping
-paths already reserved by a literal key. For example, Easton's repeated `KADESH`
-records are available as `k-KADESH.json` and `k-KADESH--2.json`; if a literal
+ids already reserved by a literal key. For example, Easton's repeated `KADESH`
+records are `k-KADESH.json` and `k-KADESH--2.json`; if a literal
 `KADESH--2` key also exists, that key retains `k-KADESH--2.json` and the second
 `KADESH` definition uses the next free suffix. Every definition appears in
 `index.json`; duplicate definitions carry an `occurrence` value identifying their
@@ -304,7 +315,7 @@ suffix. Dictionary metadata reports both the total `entry_count` and the distinc
 `unique_key_count`.
 
 `{dictionary}.json` is the complete dictionary in index order, for offline
-clients that would otherwise request every word individually.
+clients that would otherwise read every word individually.
 
 ## Plain text
 
@@ -323,14 +334,10 @@ Bytes the module wrote in Windows-1252 — the `’` of "David’s", the non-bre
 ## Scripture references
 
 Every entry that cites scripture carries `references`, in the same shape in both
-APIs. `book`, `chapter`, and `verse` are Bible API coordinates, so a client can move
+trees. `book`, `chapter`, and `verse` are Bible API coordinates, so a client can move
 from a word or a comment to the verse with a direct lookup, and build the reverse index
 from a verse to every entry that cites it. `ref` is the same reference written
-canonically, in the form the Query API accepts:
-
-```text
-https://query.getbible.net/v2/kjv/Numbers 20:1
-```
+canonically, in the form the GetBible Query API accepts, such as `Numbers 20:1`.
 
 Where the source module marks its references up — an OSIS `osisRef`, a TEI `ref`, a
 ThML `scripRef` passage, a `sword://Bible/` link — the markup decides what the text it
@@ -358,7 +365,8 @@ find it there and link it; it is present whenever the citation was located in th
 whether the markup or the prose supplied it. A citation that names no book — `12:24`,
 or `In 9:46 he is called` — belongs to the book named most recently in the text, and
 `ver. 7` to the chapter cited most recently. A comment in a commentary belongs to its own
-book and chapter until it names another.
+book and chapter until it names another, and a dictionary entry headed by the name of a
+book cites that book without naming it.
 
 Resolving a reference is the rule commentary entries already use: **it covers
 `verses` when that member is present, `verse` alone when it is not, and the whole
@@ -367,21 +375,21 @@ names a chapter, and `Mt 5-7` is three chapter items. A range that crosses a cha
 boundary, `Nu 16:1-17:13`, is published once per chapter it covers, with the API's verse
 counts deciding where chapter 16 ends. A topical list may name forty verses of one
 psalm; the item stays one item, and its `ref` may then be longer than the hundred
-characters the public Query API accepts in one request, so a client passing `ref`
-on should split `verses` where it exceeds that.
+characters the Query API accepts in one request, so a client passing `ref` on
+should split `verses` where it exceeds that.
 
 Recognising a book name is the librarian's job. Its per-translation tables and
-Unicode-normalising trie — the engine behind `query.getbible.net` — resolve `1Sa`,
-`Första Moseboken` or `Ma-thi-ơ`, and every published `ref` is read back through it, so
-a `ref` is by construction a reference the Query API resolves. `conf/book_aliases/`
-adds, in the librarian's own table format, the spellings the current modules use that
-its tables lack (Online Bible's `Lu`, `Joe`, `Jud`; Smith's `Isai`, `Psal`), ready to be
-contributed upstream; adding a spelling or a language is a data change. A convention one
-module alone follows lives in `conf/book_aliases/modules/{module}.json`, which takes
-precedence for that module: Abbott-Smith names the books as the Septuagint does, so its
-`I Ki` is 1 Samuel and its `Ez` Ezekiel, while for every other English module `Ez` is
-Ezra. A module in a language with no table is read with the names its translation
-publishes and the spellings of the translation that gives it its shape.
+Unicode-normalising trie resolve `1Sa`, `Första Moseboken` or `Ma-thi-ơ`, and every
+published `ref` is read back through it, so a `ref` is by construction a reference the
+Query API resolves. `conf/book_aliases/` adds, in the librarian's own table format, the
+spellings the current modules use that its tables lack (Online Bible's `Lu`, `Joe`,
+`Jud`; Smith's `Isai`, `Psal`), ready to be contributed upstream; adding a spelling or a
+language is a data change. A convention one module alone follows lives in
+`conf/book_aliases/modules/{module}.json`, which takes precedence for that module:
+Abbott-Smith names the books as the Septuagint does, so its `I Ki` is 1 Samuel and its
+`Ez` Ezekiel, while for every other English module `Ez` is Ezra. A module in a language
+with no table is read with the names its translation publishes and the spellings of the
+translation that gives it its shape.
 
 The Bible's shape settles what a spelling means where the spelling alone cannot. A
 number before a name is its ordinal only when the book so named has the chapter cited:
@@ -398,12 +406,28 @@ chapter the book does not have, or a verse the chapter does not have, is not pub
 the API has nothing at that address, so `1 Ki 30:1` and `Genesis 50:36` resolve to
 nothing.
 
-## Integrity and schemas
+## Integrity, schemas, and the OpenAPI description
 
-Each API root publishes `hashes.json`, a SHA-256 digest of every other generated
-document, which is also the manifest of the paths a build owns. The JSON Schemas
-for every document type are served beside the data under `v1/schema/`, so each
-schema `$id` resolves to the document that defines it.
+Each tree root publishes `hashes.json`, a SHA-256 digest of every other generated
+document, which is also the manifest of the paths a build owns. `build.json` records
+the builder and extractor versions, the build time, and the Bible API the references
+were resolved against.
+
+The JSON Schema of every document type — catalog, build record, hashes, metadata,
+and each content document — lives in `schemas/`, is what every document is validated
+against before it is written, and is published beside the data under `schema/`. A
+schema refers to a sibling by the file name it is published under, so the references
+resolve wherever the folder is served.
+
+`openapi.json`, at the root of each tree, is generated from the build: an OpenAPI 3.1
+description of every document path, its parameters (the module ids of this build,
+the book numbering, the entry ids), and the schema of each response, with the same
+schemas embedded so the document stands alone. Its paths start at `/v1`, where the
+tree starts, and it names no host, so it is true wherever the tree is mounted at a
+server's root; a deployment under a prefix adds its own `servers` entry. It also
+carries, in its description, the rules for reading the documents: addressing,
+verse-range resolution, dictionary search, and references. Nothing in this
+repository describes how to serve the trees; the description travels with them.
 
 ## Build flow
 
@@ -412,37 +436,13 @@ flowchart TD
     A["CrossWire catalog + raw ZIP"] --> B["Pinned getbiblesword release"]
     B --> C["NDJSON v1 subprocess stream"]
     C --> D["Independent stream + artifact validator"]
-    D --> E["Python API adapter + JSON Schema"]
-    E --> F["Atomic static v1 trees + SHA-256 manifest"]
+    D --> E["Python adapter + JSON Schema"]
+    E --> F["Atomic static v1 trees + SHA-256 manifest + OpenAPI description"]
     F --> G["commentaries, when publication secrets exist"]
     F --> H["dictionaries, when publication secrets exist"]
 ```
 
-The static output is the system of record. Nginx and a CDN can serve direct
-lookups without an application process, database connection pool, or request
-throttling bottleneck.
-
-## Deployment
-
-A production origin is a pull, a verify, a compress, and a sync:
-
-```bash
-scripts/deploy_static_api.sh \
-    --repo git@github.com:getbible/commentaries.git \
-    --root /var/www/getbible/commentaries \
-    --require-signature
-
-scripts/verify_live_api.sh https://commentaries.getbible.net
-```
-
-The whole tree is checked against `hashes.json` before it reaches the live root,
-so a failed build leaves the previous one serving.
-
-`docs/nginx/` holds the origin configuration for both hosts; install it with
-`scripts/install_nginx_config.sh`, which adapts it to the host's nginx version,
-brotli availability, and IPv6 support rather than leaving those as footguns.
-`docs/deployment.md` describes the server layout, the caching model, the CDN and
-security posture, rollback, and monitoring.
+The static output is the system of record. Serving it is outside this repository.
 
 ## Local development
 
@@ -477,6 +477,18 @@ study-builder build --resource commentaries --module Clarke --refresh
 python scripts/validate_build.py --resource commentaries --module Clarke
 ```
 
+`validate_build.py` checks the module's documents and the tree they sit in: the
+catalog lists the module, `hashes.json` vouches for exactly the other documents,
+the embedded schemas match the published ones, and the OpenAPI description names
+the module and no host.
+
+A complete tree from the test fixtures, without CrossWire or the extractor, for
+inspecting what a build publishes:
+
+```bash
+python tests/support/build_sample_tree.py /tmp/sample-tree
+```
+
 Partial module builds are deliberately prohibited from `--push`. A complete local
 publication run is:
 
@@ -497,7 +509,7 @@ work without downloading packages or installing the extractor.
 | --- | --- | --- |
 | `ci.yml` | pull request, branch push, manual | Ruff, formatting, unit tests, malicious-contract rejection, CLI checks |
 | `binary-smoke.yml` | relevant pull request, main push, manual | Public release verification plus real canonical and alternate-versification builds |
-| `integration.yml` | monthly, manual | Real builds of Clarke, TSK, MHCC, StrongsGreek, StrongsHebrew, and Easton; validates static lookup shape |
+| `integration.yml` | relevant pull request, main push, monthly, manual | Real builds of Clarke, TSK, MHCC, Luther, StrongsGreek, StrongsHebrew, and Easton; validates the generated trees |
 | `build.yml` | monthly, manual | Complete selected resource build; conditionally signs and pushes both output repositories |
 
 The production workflow always builds. It pushes only when the `push` input is
@@ -521,7 +533,8 @@ Publication secret set:
 
 The default output remotes are `getbible/commentaries` and
 `getbible/dictionaries`. Optional `GETBIBLE_COMMENTARIES_REPO` and
-`GETBIBLE_DICTIONARIES_REPO` secrets may select staging remotes.
+`GETBIBLE_DICTIONARIES_REPO` secrets may select staging remotes. See
+`docs/target-repositories.md` for preparing the output repositories.
 
 ## Redistribution policy
 

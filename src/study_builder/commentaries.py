@@ -49,6 +49,7 @@ class CommentaryWriter:
         self.books = books
         self.max_document_bytes = max_document_bytes
         self.chapter_schema = read_json(schemas_dir / "commentary-chapter.schema.json")
+        self.metadata_schema = read_json(schemas_dir / "commentary-metadata.schema.json")
         self.references = references
         self.source_type = ""
 
@@ -170,6 +171,7 @@ class CommentaryWriter:
             module, module_id, len(books_index), chapter_count, entry_count, storage
         )
         metadata["references"] = self.references.describe()
+        validate(metadata, self.metadata_schema)
         write_json(module_root / "metadata.json", metadata)
         record = {
             "id": module_id,

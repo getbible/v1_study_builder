@@ -1,18 +1,36 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://commentaries.getbible.net/schema/v1/commentary.json",
   "title": "GetBible Commentary v1",
   "description": "One complete commentary. Each member of books is byte-for-byte the document served at {commentary}/{book}.json. This is a bulk document; metadata.json publishes its size in bytes.",
   "type": "object",
-  "required": ["schema", "commentary", "language", "name", "books"],
+  "required": [
+    "schema",
+    "commentary",
+    "language",
+    "name",
+    "books"
+  ],
   "properties": {
-    "schema": {"const": "getbible-commentary-v1"},
-    "commentary": {"type": "string", "minLength": 1},
-    "language": {"type": "string", "minLength": 2},
-    "name": {"type": "string", "minLength": 1},
+    "schema": {
+      "const": "getbible-commentary-v1"
+    },
+    "commentary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
     "books": {
       "type": "array",
-      "items": {"$ref": "https://commentaries.getbible.net/schema/v1/commentary-book.json"}
+      "items": {
+        "$ref": "commentary-book.json"
+      }
     }
   },
   "additionalProperties": false

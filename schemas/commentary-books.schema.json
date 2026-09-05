@@ -1,6 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://commentaries.getbible.net/schema/v1/commentary-books.json",
   "title": "GetBible Commentary Books Index v1",
   "description": "Which books and chapters one commentary covers. Chapter 0 is a book introduction.",
   "type": "object",
@@ -15,23 +14,62 @@
     "books"
   ],
   "properties": {
-    "schema": {"const": "getbible-commentary-books-v1"},
-    "commentary": {"type": "string", "minLength": 1},
-    "language": {"type": "string", "minLength": 2},
-    "name": {"type": "string", "minLength": 1},
-    "book_url_template": {"const": "{book}.json"},
-    "chapter_url_template": {"const": "{book}/{chapter}.json"},
-    "book_count": {"type": "integer", "minimum": 0},
+    "schema": {
+      "const": "getbible-commentary-books-v1"
+    },
+    "commentary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "book_url_template": {
+      "const": "{book}.json"
+    },
+    "chapter_url_template": {
+      "const": "{book}/{chapter}.json"
+    },
+    "book_count": {
+      "type": "integer",
+      "minimum": 0
+    },
     "books": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["book", "name", "chapters", "entry_count"],
+        "required": [
+          "book",
+          "name",
+          "chapters",
+          "entry_count"
+        ],
         "properties": {
-          "book": {"type": "integer", "minimum": 1, "maximum": 83},
-          "name": {"type": "string", "minLength": 1},
-          "chapters": {"type": "array", "items": {"type": "integer", "minimum": 0}},
-          "entry_count": {"type": "integer", "minimum": 0}
+          "book": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 83
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "chapters": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "entry_count": {
+            "type": "integer",
+            "minimum": 0
+          }
         },
         "additionalProperties": false
       }

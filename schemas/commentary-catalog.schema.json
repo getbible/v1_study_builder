@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GetBible Commentary Catalog v1",
+  "description": "Every commentary in one v1 tree, with the path template of each of its documents relative to the tree root. The catalog and build.json are the only documents that carry the build time.",
+  "type": "object",
+  "required": [
+    "schema",
+    "version",
+    "generated_at",
+    "base_url",
+    "metadata_url_template",
+    "books_url_template",
+    "commentary_url_template",
+    "book_url_template",
+    "chapter_url_template",
+    "module_count",
+    "commentaries"
+  ],
+  "properties": {
+    "schema": {
+      "const": "getbible-commentaries-catalog-v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "base_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata_url_template": {
+      "const": "{commentary}/metadata.json"
+    },
+    "books_url_template": {
+      "const": "{commentary}/books.json"
+    },
+    "commentary_url_template": {
+      "const": "{commentary}.json"
+    },
+    "book_url_template": {
+      "const": "{commentary}/{book}.json"
+    },
+    "chapter_url_template": {
+      "const": "{commentary}/{book}/{chapter}.json"
+    },
+    "module_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "commentaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "description": "One commentary: its id is the first path segment of all of its documents, and bytes is the size of its whole-commentary document.",
+        "required": [
+          "id",
+          "name",
+          "language",
+          "license",
+          "book_count",
+          "chapter_count",
+          "entry_count",
+          "bytes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "language": {
+            "type": "string",
+            "minLength": 2
+          },
+          "license": {
+            "type": "string"
+          },
+          "book_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "chapter_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "entry_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from study_builder.util import read_json, slug
+from study_builder.util import read_json, sha256_file, slug
 
 
 def _reject_markup(document: Any, where: str) -> None:
@@ -164,6 +164,54 @@ def validate_dictionary(root: Path, complete_path: Path) -> dict[str, Any]:
     }
 
 
+def validate_tree(version_root: Path, resource: str, module_id: str) -> dict[str, Any]:
+    """The documents that describe the whole tree: catalog, build record, hashes, schemas
+    and the OpenAPI description, each true of the tree it sits in."""
+    catalog = read_json(version_root / f"{resource}.json")
+    if module_id not in {record["id"] for record in catalog[resource]}:
+        raise RuntimeError(f"{resource}.json does not list {module_id}")
+    hashes = read_json(version_root / "hashes.json")
+    published = {path.relative_to(version_root).as_posix() for path in version_root.rglob("*.json")}
+    if set(hashes["files"]) != published - {"hashes.json"}:
+        raise RuntimeError("hashes.json does not list exactly the other documents of the tree")
+    for relative, digest in hashes["files"].items():
+        if sha256_file(version_root / relative) != digest:
+            raise RuntimeError(f"hashes.json misstates the digest of {relative}")
+
+    openapi = read_json(version_root / "openapi.json")
+    if openapi.get("openapi") != "3.1.0" or "servers" in openapi:
+        raise RuntimeError("openapi.json is not a host-free OpenAPI 3.1 description")
+    parameter = "commentary" if resource == "commentaries" else "dictionary"
+    listed = {
+        item["schema"].get("enum", [None])[0]
+        for operation in openapi["paths"].values()
+        for item in operation["get"].get("parameters", ())
+        if item["name"] == parameter
+    }
+    for path, operation in openapi["paths"].items():
+        if not path.startswith("/v1/"):
+            raise RuntimeError(f"openapi.json path {path} does not start at v1")
+        for item in operation["get"].get("parameters", ()):
+            if item["name"] == parameter and module_id not in item["schema"].get("enum", ()):
+                raise RuntimeError(f"openapi.json does not list {module_id} at {path}")
+    if not listed:
+        raise RuntimeError(f"openapi.json describes no {parameter} documents")
+    for name, schema in openapi["components"]["schemas"].items():
+        published_schema = read_json(version_root / "schema" / f"{name}.json")
+        published_schema.pop("$schema", None)
+        if json.dumps(schema, sort_keys=True).count('"$ref"') != json.dumps(
+            published_schema, sort_keys=True
+        ).count('"$ref"'):
+            raise RuntimeError(f"openapi.json embeds a schema for {name} that differs")
+    if "getbible.net" in json.dumps(openapi):
+        raise RuntimeError("openapi.json names a host")
+    return {
+        "modules": len(catalog[resource]),
+        "documents": len(hashes["files"]) + 1,
+        "openapi_paths": len(openapi["paths"]),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--resource", choices=("commentaries", "dictionaries"), required=True)
@@ -179,6 +227,7 @@ def main() -> int:
         if args.resource == "commentaries"
         else validate_dictionary(root, complete_path)
     )
+    result["tree"] = validate_tree(version_root, args.resource, module_id)
     print(json.dumps({"resource": args.resource, "module": args.module, **result}, indent=2))
     return 0
 

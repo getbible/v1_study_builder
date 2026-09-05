@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
-"""Generate a complete API tree without CrossWire or the extractor.
+"""Generate a complete v1 tree without CrossWire or the extractor.
 
-Used by tests/nginx_config_check.sh to give the origin configuration something
-real to serve. It drives the actual pipeline, so the tree it produces — catalog,
-hashes.json, published schemas, and all — is exactly what a build publishes.
+For inspecting what a build publishes — catalog, openapi.json, hashes.json, the
+published schemas, and every document — without downloading a module. It drives
+the actual pipeline on the test fixtures, so the tree is exactly what a build writes.
 """
 
 from __future__ import annotations

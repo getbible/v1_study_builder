@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GetBible Commentary Metadata v1",
+  "description": "One commentary's provenance, licence, counts and sizes. bytes is the size of the whole-commentary document; storage is the build's own measurement of the module.",
+  "type": "object",
+  "required": [
+    "schema",
+    "id",
+    "module",
+    "name",
+    "language",
+    "version",
+    "license",
+    "driver",
+    "source_type",
+    "versification",
+    "book_count",
+    "chapter_count",
+    "entry_count",
+    "bytes",
+    "storage",
+    "books_url",
+    "book_url_template",
+    "chapter_url_template",
+    "source",
+    "source_module_url",
+    "text_source",
+    "copyright",
+    "copyright_holder",
+    "copyright_contact",
+    "distribution_notes",
+    "about",
+    "conversion_note",
+    "references"
+  ],
+  "properties": {
+    "schema": {
+      "const": "getbible-commentary-metadata-v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "module": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The source module's own name."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "version": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string"
+    },
+    "driver": {
+      "type": "string"
+    },
+    "source_type": {
+      "type": "string"
+    },
+    "versification": {
+      "type": "string",
+      "minLength": 1
+    },
+    "book_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "chapter_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "entry_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "storage": {
+      "type": "object",
+      "description": "How much text the source repeated across verse ranges and what each level of the output costs on disk.",
+      "required": [
+        "source_entry_count",
+        "source_text_bytes",
+        "text_bytes",
+        "repetition_ratio",
+        "chapter_bytes",
+        "book_bytes",
+        "commentary_bytes",
+        "published_bytes"
+      ],
+      "properties": {
+        "source_entry_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_text_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repetition_ratio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "chapter_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "book_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "commentary_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "published_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "books_url": {
+      "const": "books.json"
+    },
+    "book_url_template": {
+      "const": "{book}.json"
+    },
+    "chapter_url_template": {
+      "const": "{book}/{chapter}.json"
+    },
+    "source": {
+      "const": "CrossWire SWORD"
+    },
+    "source_module_url": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The module's own page at its source."
+    },
+    "text_source": {
+      "type": "string"
+    },
+    "copyright": {
+      "type": "string"
+    },
+    "copyright_holder": {
+      "type": "string"
+    },
+    "copyright_contact": {
+      "type": "object",
+      "required": [
+        "name",
+        "email",
+        "address"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "distribution_notes": {
+      "type": "string"
+    },
+    "about": {
+      "type": "string"
+    },
+    "conversion_note": {
+      "type": "string",
+      "minLength": 1
+    },
+    "references": {
+      "type": "object",
+      "description": "Which Bible the module's scripture references were resolved against: the API, the versification, the translations whose shape decided which chapters and verses exist, the translation whose book names ref uses, and the librarian and alias tables that resolved the spellings.",
+      "required": [
+        "api",
+        "versification",
+        "translations",
+        "names",
+        "language",
+        "librarian",
+        "aliases"
+      ],
+      "properties": {
+        "api": {
+          "const": "getbible-v2"
+        },
+        "versification": {
+          "type": "string"
+        },
+        "translations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "names": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "language": {
+          "type": "string"
+        },
+        "librarian": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

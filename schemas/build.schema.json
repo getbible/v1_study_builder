@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GetBible Build v1",
+  "description": "How and when one v1 tree was built: the builder and extractor, the catalog the modules were selected from and the Bible API the references were resolved against.",
+  "type": "object",
+  "required": [
+    "schema",
+    "builder",
+    "builder_version",
+    "extractor",
+    "extractor_version",
+    "extractor_contract",
+    "api_version",
+    "resource",
+    "generated_at",
+    "catalog_url",
+    "bible_api",
+    "module_count"
+  ],
+  "properties": {
+    "schema": {
+      "const": "getbible-build-v1"
+    },
+    "builder": {
+      "const": "v1_study_builder"
+    },
+    "builder_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "extractor": {
+      "const": "getbiblesword"
+    },
+    "extractor_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "extractor_contract": {
+      "type": "string",
+      "minLength": 1
+    },
+    "api_version": {
+      "const": 1
+    },
+    "resource": {
+      "enum": [
+        "commentaries",
+        "dictionaries"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "catalog_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bible_api": {
+      "type": "string",
+      "minLength": 1
+    },
+    "module_count": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}

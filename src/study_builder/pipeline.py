@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from jsonschema import validate
+
 from study_builder import __version__
 from study_builder.bible import DEFAULT_BIBLE_API, BibleApi
 from study_builder.books import BookRegistry
@@ -18,11 +20,13 @@ from study_builder.http import HttpClient
 from study_builder.models import BuildReport, ModuleDescriptor, ResourceKind
 from study_builder.modules import ModuleInstaller
 from study_builder.native import SwordExporter
+from study_builder.openapi import SCHEMA_NAMES, openapi_document
 from study_builder.policy import ModulePolicy
 from study_builder.references import ReferenceEngine
 from study_builder.util import (
     DOCUMENT_CEILING_BYTES,
     hash_tree,
+    read_json,
     replace_tree,
     reset_directory,
     slug,
@@ -34,7 +38,9 @@ LOG = logging.getLogger(__name__)
 
 # A module directory and its whole-module document both sit at the v1 root, so a
 # module identifier may never collide with a document the builder writes there.
-RESERVED_MODULE_IDS = frozenset({"build", "commentaries", "dictionaries", "hashes", "schema"})
+RESERVED_MODULE_IDS = frozenset(
+    {"build", "commentaries", "dictionaries", "hashes", "openapi", "schema"}
+)
 
 BASE_URLS: dict[str, str] = {
     "commentaries": "https://commentaries.getbible.net/v1/",
@@ -277,7 +283,8 @@ class BuildPipeline:
         for kind in resources:
             records = sorted(summaries[kind], key=lambda item: item["id"])
             self._publish_schemas(generated_roots[kind], kind)
-            write_json(
+            prefix = "commentary" if kind == "commentaries" else "dictionary"
+            self._write_document(
                 generated_roots[kind] / f"{kind}.json",
                 {
                     "schema": f"getbible-{kind}-catalog-v1",
@@ -288,10 +295,12 @@ class BuildPipeline:
                     "module_count": len(records),
                     kind: records,
                 },
+                f"{prefix}-catalog",
             )
-            write_json(
+            self._write_document(
                 generated_roots[kind] / "build.json",
                 {
+                    "schema": "getbible-build-v1",
                     "builder": "v1_study_builder",
                     "builder_version": __version__,
                     "extractor": "getbiblesword",
@@ -304,16 +313,26 @@ class BuildPipeline:
                     "bible_api": self.config.bible_api,
                     "module_count": len(records),
                 },
+                "build",
+            )
+            # The tree describes itself to whoever serves or consumes it. The builder
+            # names no host: the description starts at v1, where the tree starts.
+            write_json(
+                generated_roots[kind] / "openapi.json",
+                openapi_document(
+                    kind, [record["id"] for record in records], self.config.schemas_dir
+                ),
             )
             # hashes.json covers every other generated document and is therefore
             # also the manifest of the paths this build owns.
-            write_json(
+            self._write_document(
                 generated_roots[kind] / "hashes.json",
                 {
                     "schema": "getbible-hashes-v1",
                     "algorithm": "sha256",
                     "files": hash_tree(generated_roots[kind], exclude={"hashes.json"}),
                 },
+                "hashes",
             )
             dist_root = self.config.dist_dir / kind / "v1"
             replace_tree(generated_roots[kind], dist_root)
@@ -338,14 +357,19 @@ class BuildPipeline:
         self._write_report(report)
         return report
 
+    def _write_document(self, path: Path, document: dict[str, Any], schema: str) -> None:
+        """Write one tree-level document after checking it against its published schema."""
+        validate(document, read_json(self.config.schemas_dir / f"{schema}.schema.json"))
+        write_json(path, document)
+
     def _publish_schemas(self, root: Path, kind: ResourceKind) -> None:
-        """Serve the document schemas alongside the data so every $id resolves."""
-        prefix = "commentary" if kind == "commentaries" else "dictionary"
+        """Publish the schema of every document type beside the data, under schema/."""
         destination = root / "schema"
         destination.mkdir(parents=True, exist_ok=True)
-        for source in sorted(self.config.schemas_dir.glob(f"{prefix}*.schema.json")):
-            name = source.name.removesuffix(".schema.json") + ".json"
-            shutil.copyfile(source, destination / name)
+        for name in SCHEMA_NAMES[kind]:
+            shutil.copyfile(
+                self.config.schemas_dir / f"{name}.schema.json", destination / f"{name}.json"
+            )
 
     def _write_report(self, report: BuildReport) -> None:
         write_json(self.config.work_dir / "reports" / "latest.json", report.as_dict())

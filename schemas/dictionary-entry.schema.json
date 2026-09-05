@@ -1,38 +1,102 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dictionaries.getbible.net/schema/v1/dictionary-entry.json",
   "title": "GetBible Dictionary Entry v1",
   "description": "One word of one dictionary. see_also lists the words this entry points at; backlinks lists the words that point back.",
   "type": "object",
-  "required": ["schema", "dictionary", "language", "id", "key", "occurrence", "aliases", "text"],
+  "required": [
+    "schema",
+    "dictionary",
+    "language",
+    "id",
+    "key",
+    "occurrence",
+    "aliases",
+    "text"
+  ],
   "properties": {
-    "schema": {"const": "getbible-dictionary-entry-v1"},
-    "dictionary": {"type": "string", "minLength": 1},
-    "language": {"type": "string", "minLength": 2},
-    "id": {"type": "string", "minLength": 1},
-    "key": {"type": "string", "minLength": 1},
-    "occurrence": {"type": "integer", "minimum": 1},
-    "aliases": {"type": "array", "items": {"type": "string"}, "minItems": 1},
-    "text": {"type": "string"},
-    "see_also": {"$ref": "#/$defs/links"},
-    "backlinks": {"$ref": "#/$defs/links"},
+    "schema": {
+      "const": "getbible-dictionary-entry-v1"
+    },
+    "dictionary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "occurrence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "text": {
+      "type": "string"
+    },
+    "see_also": {
+      "$ref": "#/$defs/links"
+    },
+    "backlinks": {
+      "$ref": "#/$defs/links"
+    },
     "references": {
       "type": "array",
       "items": {
         "type": "object",
         "description": "One scripture reference, resolved against the GetBible Bible API. book, chapter, and verse are Bible API coordinates; verses lists every verse covered when there is more than one, and an item without verse covers the whole chapter. ref is the same reference written canonically, in the book name the module's language uses, in the form the Query API accepts. text is present when the citation was located in the entry text: the citation exactly as the text spells it.",
-        "required": ["ref", "osis", "book", "chapter"],
+        "required": [
+          "ref",
+          "osis",
+          "book",
+          "chapter"
+        ],
         "properties": {
-          "text": {"type": "string", "minLength": 1},
-          "ref": {"type": "string", "minLength": 1},
-          "osis": {"type": "string", "minLength": 1},
-          "book": {"type": "integer", "minimum": 1, "maximum": 83},
-          "chapter": {"type": "integer", "minimum": 0},
-          "verse": {"type": "integer", "minimum": 0},
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "osis": {
+            "type": "string",
+            "minLength": 1
+          },
+          "book": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 83
+          },
+          "chapter": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "verse": {
+            "type": "integer",
+            "minimum": 0
+          },
           "verses": {
             "type": "array",
             "description": "Every verse this reference covers, including verse. Absent when it covers only verse.",
-            "items": {"type": "integer", "minimum": 0},
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
             "minItems": 2,
             "uniqueItems": true
           }
@@ -47,10 +111,19 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "key"],
+        "required": [
+          "id",
+          "key"
+        ],
         "properties": {
-          "id": {"type": "string", "minLength": 1},
-          "key": {"type": "string", "minLength": 1}
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "additionalProperties": false
       }

@@ -29,12 +29,6 @@ using forks, staging repositories, or non-GitHub remotes.
 Protect `main` on both generated repositories against manual changes, while
 allowing the builder deploy key to push.
 
-Do not serve a checkout directly. `scripts/deploy_static_api.sh` pulls into a
-working copy, verifies it against `hashes.json`, and syncs only the version
-directories to the live root, so no repository metadata reaches the origin. See
-[deployment.md](deployment.md) for the full origin setup; no application runtime
-is required.
-
 The production workflow always completes the requested build. It invokes the
 publication steps only when all six Git author/signing/SSH values are present and
 the workflow's `push` input is enabled. Missing publication secrets therefore do

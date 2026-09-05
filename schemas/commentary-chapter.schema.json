@@ -1,20 +1,47 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://commentaries.getbible.net/schema/v1/commentary-chapter.json",
   "title": "GetBible Commentary Chapter v1",
   "description": "One chapter of one commentary. Chapter 0 carries the book introduction and verse 0 carries a chapter introduction.",
   "type": "object",
-  "required": ["schema", "commentary", "language", "book", "name", "chapter", "entries"],
+  "required": [
+    "schema",
+    "commentary",
+    "language",
+    "book",
+    "name",
+    "chapter",
+    "entries"
+  ],
   "properties": {
-    "schema": {"const": "getbible-commentary-chapter-v1"},
-    "commentary": {"type": "string", "minLength": 1},
-    "language": {"type": "string", "minLength": 2},
-    "book": {"type": "integer", "minimum": 1, "maximum": 83},
-    "name": {"type": "string", "minLength": 1},
-    "chapter": {"type": "integer", "minimum": 0},
+    "schema": {
+      "const": "getbible-commentary-chapter-v1"
+    },
+    "commentary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "book": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 83
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "chapter": {
+      "type": "integer",
+      "minimum": 0
+    },
     "entries": {
       "type": "array",
-      "items": {"$ref": "#/$defs/entry"}
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
     }
   },
   "additionalProperties": false,
@@ -22,10 +49,22 @@
     "entry": {
       "type": "object",
       "description": "One comment. A source module attaches a comment to a verse range and repeats it for every verse in that range; it is published once here, anchored at the lowest verse it covers, with `verses` listing every verse it applies to when that is more than one.",
-      "required": ["book", "chapter", "verse", "text"],
+      "required": [
+        "book",
+        "chapter",
+        "verse",
+        "text"
+      ],
       "properties": {
-        "book": {"type": "integer", "minimum": 1, "maximum": 83},
-        "chapter": {"type": "integer", "minimum": 0},
+        "book": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 83
+        },
+        "chapter": {
+          "type": "integer",
+          "minimum": 0
+        },
         "verse": {
           "type": "integer",
           "minimum": 0,
@@ -34,7 +73,10 @@
         "verses": {
           "type": "array",
           "description": "Every verse this comment covers, including `verse`. Absent when it covers only `verse`.",
-          "items": {"type": "integer", "minimum": 0},
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
           "minItems": 2,
           "uniqueItems": true
         },
@@ -43,8 +85,12 @@
           "minLength": 1,
           "description": "The source module's own key for the anchor verse."
         },
-        "text": {"type": "string"},
-        "references": {"$ref": "#/$defs/references"}
+        "text": {
+          "type": "string"
+        },
+        "references": {
+          "$ref": "#/$defs/references"
+        }
       },
       "additionalProperties": false
     },
@@ -53,18 +99,45 @@
       "items": {
         "type": "object",
         "description": "One scripture reference, resolved against the GetBible Bible API. book, chapter, and verse are Bible API coordinates; verses lists every verse covered when there is more than one, and an item without verse covers the whole chapter. ref is the same reference written canonically, in the book name the module's language uses, in the form the Query API accepts. text is present when the citation was located in the entry text: the citation exactly as the text spells it.",
-        "required": ["ref", "osis", "book", "chapter"],
+        "required": [
+          "ref",
+          "osis",
+          "book",
+          "chapter"
+        ],
         "properties": {
-          "text": {"type": "string", "minLength": 1},
-          "ref": {"type": "string", "minLength": 1},
-          "osis": {"type": "string", "minLength": 1},
-          "book": {"type": "integer", "minimum": 1, "maximum": 83},
-          "chapter": {"type": "integer", "minimum": 0},
-          "verse": {"type": "integer", "minimum": 0},
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "osis": {
+            "type": "string",
+            "minLength": 1
+          },
+          "book": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 83
+          },
+          "chapter": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "verse": {
+            "type": "integer",
+            "minimum": 0
+          },
           "verses": {
             "type": "array",
             "description": "Every verse this reference covers, including verse. Absent when it covers only verse.",
-            "items": {"type": "integer", "minimum": 0},
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
             "minItems": 2,
             "uniqueItems": true
           }
