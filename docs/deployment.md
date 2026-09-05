@@ -15,7 +15,7 @@ same command with the other's repository and root.
 
 ## What the builder guarantees
 
-The deploy depends on four properties. If you change the builder, keep them, or
+The deploy depends on five properties. If you change the builder, keep them, or
 the deployment stops being safe:
 
 1. **Output is byte-stable.** A module that has not changed rebuilds to an
@@ -30,9 +30,14 @@ the deployment stops being safe:
 4. **Every document is plain text JSON.** No HTML is published anywhere, which
    is why the origin can send `Content-Security-Policy: default-src 'none'` and
    why no consumer has to sanitize a response.
-5. **No document exceeds `--max-document-bytes`** (95 MB by default). The build
+5. **No document exceeds `--max-document-bytes`** (95 MiB by default). The build
    fails naming the offending file rather than publishing a tree the publication
    remote would reject, so the origin never sees a half-pushed corpus.
+
+JSON is compact, and book and whole-module documents embed their parts without
+indentation padding. The first rebuild of an older indented tree changes its
+document bytes, sizes, and hashes; subsequent unchanged builds remain byte-stable.
+This does not change API paths, fields, values, or the size ceiling.
 
 ## Server layout
 
@@ -71,9 +76,14 @@ configuration keeps serving the same webroot afterwards so renewals need no
 further changes:
 
 ```bash
-certbot certonly --webroot -w /var/www/html \
-    -d commentaries.getbible.net -d dictionaries.getbible.net
+for host in commentaries.getbible.net dictionaries.getbible.net; do
+    certbot certonly --cert-name "$host" --webroot -w /var/www/html -d "$host"
+done
 ```
+
+Issue a separate certificate lineage for each host: the nginx configurations
+load their certificates from `/etc/letsencrypt/live/<hostname>/`. A single
+certificate containing both names creates only one lineage directory.
 
 Then install the origin configuration:
 
@@ -121,12 +131,14 @@ live root until it has been proven good:
 
 1. **Pull.** `git reset --hard` into the persistent checkout. Git rewrites only
    files whose content changed, so every unchanged document keeps its mtime.
+   `--ref` accepts a branch or tag and deploys the commit just fetched.
 2. **Verify.** Every digest in `hashes.json` is recomputed, and any `.json` in
    the tree that the manifest does not list is an error. A build that fails here
    never reaches the live root; the previous deploy keeps serving.
 3. **Compress.** `.gz` and `.br` are written beside each document, but only
    where missing or stale, and each variant is stamped with its document's
    mtime. A monthly rebuild that changes two modules recompresses two modules.
+   A failed compressor aborts the deploy before any live file is changed.
 4. **Sync.** `rsync --delete --delay-updates`, one version directory at a time.
    Scoping the delete to a single version means no failure of this script can
    remove anything outside a version directory.
@@ -150,6 +162,8 @@ sudo -u deploy gpg --lsign-key <key-id>
 Verification covers every file, not only the JSON documents: anything present in
 a version directory that `hashes.json` does not list fails the deploy. A stray
 `.html` or `.js` would otherwise be served from the API's own hostname.
+Manifest paths must be relative and remain within the version directory;
+symlinks are rejected throughout the published tree.
 
 Use `--dry-run` to see the exact change set without touching the live root.
 

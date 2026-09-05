@@ -112,6 +112,13 @@ publication rule. Any missing footer, checksum failure, failed diagnostic,
 extractor error, or classification mismatch stops the complete build before
 publication.
 
+Generated JSON uses compact serialization to keep reference-heavy modules within
+the unchanged 95 MiB document ceiling. Composed documents copy their nested
+documents byte-for-byte without adding indentation. Paths, fields, values, and
+array order are unchanged; rebuilding an older, indented tree changes its file
+bytes, measured sizes, and SHA-256 hashes once. The formatted examples below are
+for readability.
+
 ## Commentary API
 
 ```text
@@ -225,7 +232,7 @@ of this module rather than anything a client needs:
 across the verse range it was attached to — the multiplier the collapse removes. The
 three `*_bytes` members are what each level of the API costs on disk.
 
-No generated document may exceed `--max-document-bytes` (default 95 MB, just under the
+No generated document may exceed `--max-document-bytes` (default 95 MiB, just under the
 100 MB a Git remote refuses). The build fails and names the file rather than producing
 a tree that is rejected at push time, hours later. Set it to `0` to disable the check.
 
@@ -286,10 +293,14 @@ citations written in the text itself are published.
 
 Some SWORD dictionaries legitimately contain more than one definition for the
 same public key. The first definition keeps the canonical direct path, and later
-definitions receive deterministic `--2`, `--3`, and subsequent suffixes. For
-example, Easton's repeated `KADESH` records are available as `k-KADESH.json` and
-`k-KADESH--2.json`. Every definition appears in `index.json` with an `occurrence`
-value. Dictionary metadata reports both the total `entry_count` and the distinct
+definitions receive deterministic `--2`, `--3`, and subsequent suffixes, skipping
+paths already reserved by a literal key. For example, Easton's repeated `KADESH`
+records are available as `k-KADESH.json` and `k-KADESH--2.json`; if a literal
+`KADESH--2` key also exists, that key retains `k-KADESH--2.json` and the second
+`KADESH` definition uses the next free suffix. Every definition appears in
+`index.json`; duplicate definitions carry an `occurrence` value identifying their
+actual position among definitions of the same key, independent of the filename
+suffix. Dictionary metadata reports both the total `entry_count` and the distinct
 `unique_key_count`.
 
 `{dictionary}.json` is the complete dictionary in index order, for offline
@@ -473,8 +484,12 @@ publication run is:
 study-builder build --resource all --pull --push
 ```
 
-Use `--offline` only after catalog, package, and Bible API caches exist. Use `--dry-run`
-to show approved work without downloading packages or installing the extractor.
+Use `--offline` only after catalog, package, and Bible API caches exist and the
+pinned extractor is available as a verified executable or a cached release archive
+whose SHA-256 matches the manifest. Missing required cached inputs fail the build;
+module packages and extractor releases are never downloaded as an offline fallback.
+`--offline` cannot be combined with `--refresh`. Use `--dry-run` to show approved
+work without downloading packages or installing the extractor.
 
 ## Automation
 
