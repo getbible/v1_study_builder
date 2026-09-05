@@ -14,7 +14,7 @@
 #   * brotli_static needs ngx_brotli, which many distributions do not package.
 #   * IPv6 listeners fail outright on a host without IPv6.
 #
-# Nothing is written until every adapted file has passed nginx -t.
+# The adapted configuration must pass nginx -t before nginx is reloaded.
 #
 # Requires: bash 4, nginx.
 
@@ -77,8 +77,11 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
         printf '%s: no certificate for: %s\n\n' "$PROGRAM" "${missing[*]}" >&2
         printf 'Issue them first. The stock nginx site already serves the ACME\n' >&2
         printf 'webroot on port 80, so this works before anything here is installed:\n\n' >&2
-        printf '  certbot certonly --webroot -w /var/www/html%s\n\n' \
-            "$(printf ' \\\n      -d %s' "${missing[@]}")" >&2
+        for host in "${missing[@]}"; do
+            printf '  certbot certonly --cert-name %s --webroot -w /var/www/html -d %s\n' \
+                "$host" "$host" >&2
+        done
+        printf '\n' >&2
         exit 1
     fi
 fi
@@ -125,7 +128,7 @@ if [[ "$ROOT_DIR" != "/var/www/getbible" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Build the adapted set in a staging directory and test it before installing.
+# Build the adapted set in a staging directory before installing and testing.
 # ---------------------------------------------------------------------------
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT

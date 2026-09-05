@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/binary-smoke.yml"
-      - "conf/getbiblesword.json"
+      - "conf/**"
       - "pyproject.toml"
       - "requirements*.txt"
       - "schemas/**"
@@ -16,7 +16,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/binary-smoke.yml"
-      - "conf/getbiblesword.json"
+      - "conf/**"
       - "pyproject.toml"
       - "requirements*.txt"
       - "schemas/**"

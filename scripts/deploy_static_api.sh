@@ -22,7 +22,7 @@
 #      both the integrity manifest and the list of paths the builder owns, so it
 #      is what this script verifies before anything goes live.
 #
-# Requires: bash 4, git, rsync, python3, gzip. Uses brotli when present.
+# Requires: bash 4, git, rsync, python3, gzip, flock. Uses brotli when present.
 
 set -euo pipefail
 
@@ -87,7 +87,7 @@ done
 [[ "$JOBS" =~ ^[1-9][0-9]*$ ]] || die "--jobs must be a positive integer"
 [[ -n "$WORK" ]] || WORK="/var/lib/getbible/$(basename "$ROOT")"
 
-for tool in git rsync python3 gzip; do
+for tool in git rsync python3 gzip flock; do
     command -v "$tool" >/dev/null || die "$tool is required but not installed"
 done
 
@@ -113,7 +113,10 @@ else
     fi
     log "fetching $REF"
     git -C "$WORK" fetch --prune origin "$REF"
-    git -C "$WORK" reset --hard "origin/$REF"
+    # FETCH_HEAD is the exact fetched commit for both branches and tags. A
+    # tag has no origin/<name> tracking ref, and another branch might not be
+    # in the single-branch clone's configured fetch refspec.
+    git -C "$WORK" reset --hard FETCH_HEAD
     # Drop anything untracked except the compressed variants, which this script
     # owns and prunes itself. Cleaning those away would force a full brotli pass
     # over the whole corpus on every deploy.
@@ -141,6 +144,8 @@ from pathlib import Path
 
 root = Path(sys.argv[1])
 manifest_path = root / "hashes.json"
+if root.is_symlink() or manifest_path.is_symlink():
+    sys.exit(f"symlinked version directory or manifest: {root}")
 if not manifest_path.is_file():
     sys.exit(f"no hashes.json under {root}")
 
@@ -154,8 +159,17 @@ if not files:
 
 problems = []
 for relative, expected in sorted(files.items()):
-    path = root / relative
-    if ".." in Path(relative).parts or path.is_symlink():
+    member = Path(relative)
+    path = root / member
+    if (
+        member.is_absolute()
+        or not member.parts
+        or ".." in member.parts
+        or any(
+            root.joinpath(*member.parts[:index]).is_symlink()
+            for index in range(1, len(member.parts) + 1)
+        )
+    ):
         problems.append(f"unsafe manifest path: {relative}")
         continue
     if not path.is_file():
@@ -175,6 +189,9 @@ for relative, expected in sorted(files.items()):
 variants = (".json.gz", ".json.br")
 published = set()
 for path in root.rglob("*"):
+    if path.is_symlink():
+        problems.append(f"symlink in published tree: {path.relative_to(root).as_posix()}")
+        continue
     if not path.is_file():
         continue
     relative = path.relative_to(root).as_posix()
@@ -228,7 +245,7 @@ export -f compress_one
 log "compressing with $JOBS job(s)"
 # shellcheck disable=SC2016  # $1 is the child shell's argument, not this one's
 find "$WORK" -path "$WORK/.git" -prune -o -type f -name '*.json' -print0 \
-    | xargs -0 -r -P "$JOBS" -I{} bash -c 'compress_one "$1"' _ {}
+    | xargs -0 -r -P "$JOBS" -I{} bash -euo pipefail -c 'compress_one "$1"' _ {}
 
 # Drop variants whose document no longer exists, so a removed module cannot
 # leave a stale compressed copy that nginx would still serve.
