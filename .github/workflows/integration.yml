@@ -6,8 +6,24 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/integration.yml"
-      - "conf/getbiblesword.json"
+      - "conf/**"
+      - "pyproject.toml"
+      - "requirements*.txt"
+      - "schemas/**"
+      - "scripts/validate_build.py"
       - "src/**"
+      - "tests/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/integration.yml"
+      - "conf/**"
+      - "pyproject.toml"
+      - "requirements*.txt"
+      - "schemas/**"
+      - "scripts/validate_build.py"
+      - "src/**"
+      - "tests/**"
   schedule:
     - cron: "27 3 15 * *"
   workflow_dispatch:
@@ -62,10 +78,12 @@ jobs:
           --resource "${{ matrix.resource }}"
           --module "${{ matrix.module }}"
       - name: Upload representative static JSON
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.resource }}-${{ matrix.module }}-${{ github.run_id }}
           path: |
             dist/
             .work/reports/latest.json
+          if-no-files-found: warn
           retention-days: 7
