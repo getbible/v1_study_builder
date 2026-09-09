@@ -18,7 +18,7 @@ from study_builder.references import ReferenceEngine
 CHAPTERS = {10: (4, 6, 7), 11: (2, 3), 13: (1, 3, 4), 14: (2, 4), 15: (), 16: (1,)}
 
 
-def write_translation(tree, abbreviation, chapters, *, versification="Luther"):
+def write_translation(tree, abbreviation, chapters, *, versification="NRSV"):
     books = [
         {
             "nr": 71,
@@ -66,13 +66,13 @@ def sparse_api(tmp_path):
     return BibleApi(tree, cache_dir=tmp_path / "cache")
 
 
-def new_engine(api, module_id=None):
+def new_engine(api, module_id=None, language="fi"):
     root = Path(__file__).resolve().parents[1]
     return ReferenceEngine.for_module(
         api,
         BookRegistry(root / "conf/book_registry.json"),
-        "fi",
-        "Luther",
+        language,
+        "NRSV",
         module_id=module_id,
     )
 
@@ -85,7 +85,7 @@ def coordinates(items):
 
 
 def test_sparse_shape_preserves_membership_and_counts(sparse_api):
-    canon = sparse_api.canon_for("fi", "Luther")
+    canon = sparse_api.canon_for("fi", "NRSV")
     book = canon.books[71]
     assert book.chapter_numbers() == (10, 11, 13, 14, 15, 16)
     assert book.chapter_count == 6
@@ -118,9 +118,11 @@ def test_sparse_shape_survives_offline_cache_reload(sparse_api):
     assert "fixture text" not in json.dumps(record)
 
 
-@pytest.mark.parametrize("module_id", ["sentiment", "varapp"])
-def test_the_affected_modules_can_initialize_with_sparse_shape(sparse_api, module_id):
-    engine = new_engine(sparse_api, module_id)
+@pytest.mark.parametrize("module_id, language", [("sentiment", "zxx"), ("varapp", "grc")])
+def test_the_affected_modules_can_initialize_with_sparse_shape(sparse_api, module_id, language):
+    # Reproduce the failed run's selected shape provider and the modules' languages.
+    # Extractor configuration and full module conversion are exercised by integration CI.
+    engine = new_engine(sparse_api, module_id, language)
     assert coordinates(engine.from_osis("AddEsth.10.4-AddEsth.14.4")) == [
         (10, [4, 6, 7]),
         (11, None),
@@ -170,7 +172,7 @@ def test_a_single_sparse_chapter_is_not_reinterpreted_as_chapter_one(sparse_api)
         translations=("finnish1776",),
         names_translation=None,
         language="fi",
-        versification="Luther",
+        versification="NRSV",
     )
     registry = new_engine(sparse_api).registry
     engine = ReferenceEngine(canon, registry)
@@ -196,11 +198,11 @@ def test_name_probes_use_an_actual_chapter(sparse_api, monkeypatch):
 def test_companion_translations_union_only_coordinates_that_exist(sparse_api):
     tree = Path(sparse_api.location)
     first = write_translation(tree, "finnish1776", {10: (4, 7)})
-    second = write_translation(tree, "companion", {10: (6, 7), 13: (2,)}, versification="LutherA")
+    second = write_translation(tree, "companion", {10: (6, 7), 13: (2,)}, versification="NRSVA")
     (tree / "translations.json").write_text(
         json.dumps({"finnish1776": first, "companion": second}), encoding="utf-8"
     )
-    canon = sparse_api.canon_for("fi", "Luther")
+    canon = sparse_api.canon_for("fi", "NRSV")
     assert canon.chapter_numbers(71) == (10, 13)
     assert canon.verse_numbers(71, 10) == (4, 6, 7)
     assert canon.verse_numbers(71, 13) == (2,)

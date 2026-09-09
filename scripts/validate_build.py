@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from jsonschema import validate
+
 from study_builder.util import read_json, sha256_file, slug
 
 
@@ -170,6 +172,10 @@ def validate_tree(version_root: Path, resource: str, module_id: str) -> dict[str
     catalog = read_json(version_root / f"{resource}.json")
     if module_id not in {record["id"] for record in catalog[resource]}:
         raise RuntimeError(f"{resource}.json does not list {module_id}")
+    report = read_json(version_root / "build-report.json")
+    validate(report, read_json(version_root / "schema/build-report.json"))
+    if report["status"] not in {"success", "partial"}:
+        raise RuntimeError("The published build report has no completed compilation")
     hashes = read_json(version_root / "hashes.json")
     published = {path.relative_to(version_root).as_posix() for path in version_root.rglob("*.json")}
     if set(hashes["files"]) != published - {"hashes.json"}:
@@ -206,6 +212,9 @@ def validate_tree(version_root: Path, resource: str, module_id: str) -> dict[str
     if "getbible.net" in json.dumps(openapi):
         raise RuntimeError("openapi.json names a host")
     return {
+        "build_status": report["status"],
+        "failed_modules": len(report["failed"]),
+        "retained_modules": len(report["retained"]),
         "modules": len(catalog[resource]),
         "documents": len(hashes["files"]) + 1,
         "openapi_paths": len(openapi["paths"]),

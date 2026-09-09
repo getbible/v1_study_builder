@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GetBible Build Report v1",
+  "description": "Compilation status and actionable diagnostics for one build. A published snapshot is captured before repository publication; the workflow report is updated with later publication errors. Successfully rebuilt modules and retained previous modules are listed separately.",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "started_at",
+    "completed_at",
+    "requested_resource",
+    "catalog_url",
+    "built",
+    "skipped",
+    "failed",
+    "retained",
+    "errors",
+    "diagnostics",
+    "storage",
+    "commits"
+  ],
+  "properties": {
+    "schema": {
+      "const": "getbible-build-report-v1"
+    },
+    "status": {
+      "enum": [
+        "running",
+        "success",
+        "partial",
+        "failed"
+      ],
+      "description": "Running is an in-progress checkpoint. Success means all approved modules built; partial means usable output exists with reported failures. Failed means the run could not complete safely. Publication failures are recorded in the workflow report."
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "requested_resource": {
+      "enum": [
+        "all",
+        "commentaries",
+        "dictionaries"
+      ]
+    },
+    "catalog_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "built": {
+      "type": "object",
+      "required": [
+        "commentaries",
+        "dictionaries"
+      ],
+      "properties": {
+        "commentaries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dictionaries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "skipped": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/moduleIssue"
+      }
+    },
+    "failed": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/moduleFailure"
+      }
+    },
+    "retained": {
+      "type": "array",
+      "description": "Failed modules whose prior verified documents remain in the published tree.",
+      "items": {
+        "$ref": "#/$defs/moduleIssue"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "stage",
+          "error_type",
+          "reason"
+        ],
+        "properties": {
+          "stage": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string"
+          },
+          "resource": {
+            "enum": [
+              "commentaries",
+              "dictionaries"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "commits": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "moduleIssue": {
+      "type": "object",
+      "required": [
+        "resource",
+        "module",
+        "reason"
+      ],
+      "properties": {
+        "resource": {
+          "enum": [
+            "commentaries",
+            "dictionaries"
+          ]
+        },
+        "module": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "moduleFailure": {
+      "type": "object",
+      "required": [
+        "resource",
+        "module",
+        "reason",
+        "stage",
+        "error_type"
+      ],
+      "properties": {
+        "resource": {
+          "enum": [
+            "commentaries",
+            "dictionaries"
+          ]
+        },
+        "module": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "error_type": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

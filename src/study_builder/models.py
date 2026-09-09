@@ -68,11 +68,14 @@ class BuildReport:
     requested_resource: str
     catalog_url: str
     completed_at: str | None = None
+    status: str = "running"
     built: dict[str, list[str]] = field(
         default_factory=lambda: {"commentaries": [], "dictionaries": []}
     )
     skipped: list[dict[str, str]] = field(default_factory=list)
     failed: list[dict[str, str]] = field(default_factory=list)
+    retained: list[dict[str, str]] = field(default_factory=list)
+    errors: list[dict[str, str]] = field(default_factory=list)
     diagnostics: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     commits: dict[str, str | None] = field(default_factory=dict)
     # Measured per module: how much the source repeated, and what each level costs.
@@ -80,6 +83,8 @@ class BuildReport:
 
     def as_dict(self) -> dict[str, Any]:
         return {
+            "schema": "getbible-build-report-v1",
+            "status": self.status,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "requested_resource": self.requested_resource,
@@ -87,6 +92,8 @@ class BuildReport:
             "built": self.built,
             "skipped": self.skipped,
             "failed": self.failed,
+            "retained": self.retained,
+            "errors": self.errors,
             "diagnostics": self.diagnostics,
             "storage": self.storage,
             "commits": self.commits,
