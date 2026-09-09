@@ -71,12 +71,15 @@ Before a module is written, the builder reads from the Bible API v2:
 1. `translations.json`, to know each translation's language and versification;
 2. `{translation}/books.json`, for the numbered book names of the translations it uses;
 3. `{translation}.json` and `{translation}.sha`, once per translation, from which it keeps
-   only how many chapters each book has and how many verses each chapter has.
+   only the actual chapter and verse numbers each book contains.
 
 No scripture text is published or kept. The shape is cached under `.work/bible/` with
 the hash it was downloaded under, and on every online build the hash is read again and
 the shape refreshed when it changed, which is what the API's cache policy asks of every
-consumer. `--offline` uses the cache alone.
+consumer. `--offline` uses the cache alone. Chapter or verse numbering may start above
+one and contain gaps: these coordinates are preserved, never renumbered or filled
+with invented entries. Reference ranges include only coordinates the API actually
+contains.
 
 A module is matched to translations by its `Versification` (`KJV` when it states none):
 the best translation in that versification, preferably in the module's language, plus its
@@ -110,10 +113,11 @@ canonical GetBible book/chapter order; this supports source modules whose versif
 orders canonical or deuterocanonical books differently. Dictionary definitions are written
 one at a time. Book, whole-commentary, and whole-dictionary documents are streamed
 from the documents they contain rather than assembled in memory. This keeps memory
-bounded for large modules without weakening the contract or the all-or-nothing
-publication rule. Any missing footer, checksum failure, failed diagnostic,
-extractor error, or classification mismatch stops the complete build before
-publication.
+bounded for large modules without weakening the contract. Any missing footer,
+checksum failure, failed diagnostic, extractor error, or classification mismatch
+rejects that module. Its writes remain isolated, its failure is reported, and other
+modules continue. Only validated module output enters the published tree. Shared
+configuration and integrity prerequisites remain fatal failures.
 
 Generated JSON uses compact serialization to keep reference-heavy modules within
 the 95 MiB document ceiling. Composed documents copy their nested documents
@@ -126,8 +130,8 @@ Every consumer of the trees, and the OpenAPI description, rely on these properti
 Keep them when changing the builder:
 
 1. **Output is byte-stable.** A module that has not changed rebuilds to an identical
-   file. Content documents carry no timestamp; only `build.json` and the catalog do,
-   so an unchanged corpus produces an unchanged tree.
+   file. Content documents carry no timestamp; build records, the catalog, and the
+   build report describe each run and may change even when content is unchanged.
 2. **`hashes.json` describes the whole tree.** It holds a SHA-256 for every other
    document, so it is both the integrity manifest and the list of paths the builder
    owns.
@@ -136,9 +140,8 @@ Keep them when changing the builder:
 4. **Every document is plain-text JSON**, validated against its published schema
    before it is written.
 5. **No document exceeds `--max-document-bytes`** (95 MiB by default, just under the
-   100 MB a Git remote refuses). The build fails and names the file rather than
-   producing a tree that is rejected at push time, hours later. Set it to `0` to
-   disable the check.
+   100 MB a Git remote refuses). The affected module is rejected and its report
+   names the file before publication. Set it to `0` to disable the check.
 
 ## Commentary tree
 
@@ -147,6 +150,7 @@ Relative to `commentaries/v1/`:
 ```text
 commentaries.json                      catalog: every commentary, with counts, sizes, and path templates
 build.json                             which builder, extractor, and Bible API produced the tree, and when
+build-report.json                      compilation outcome, module failures, and retained previous output
 hashes.json                            SHA-256 of every other document
 openapi.json                           the OpenAPI description of the tree
 schema/{document}.json                 the JSON Schema of every document type
@@ -253,6 +257,7 @@ Relative to `dictionaries/v1/`:
 ```text
 dictionaries.json                      catalog: every dictionary, with counts, sizes, and path templates
 build.json                             which builder, extractor, and Bible API produced the tree, and when
+build-report.json                      compilation outcome, module failures, and retained previous output
 hashes.json                            SHA-256 of every other document
 openapi.json                           the OpenAPI description of the tree
 schema/{document}.json                 the JSON Schema of every document type
@@ -413,7 +418,7 @@ document, which is also the manifest of the paths a build owns. `build.json` rec
 the builder and extractor versions, the build time, and the Bible API the references
 were resolved against.
 
-The JSON Schema of every document type — catalog, build record, hashes, metadata,
+The JSON Schema of every document type — catalog, build record, build report, hashes, metadata,
 and each content document — lives in `schemas/`, is what every document is validated
 against before it is written, and is published beside the data under `schema/`. A
 schema refers to a sibling by the file name it is published under, so the references
@@ -489,8 +494,9 @@ inspecting what a build publishes:
 python tests/support/build_sample_tree.py /tmp/sample-tree
 ```
 
-Partial module builds are deliberately prohibited from `--push`. A complete local
-publication run is:
+A limited `--module` selection is deliberately prohibited from `--push`. A full
+selection may publish its validated updates even when an individual module fails;
+previous valid output for that module is retained. A full publication run is:
 
 ```bash
 study-builder build --resource all --pull --push
@@ -509,13 +515,22 @@ work without downloading packages or installing the extractor.
 | --- | --- | --- |
 | `ci.yml` | pull request, branch push, manual | Ruff, formatting, unit tests, malicious-contract rejection, CLI checks |
 | `binary-smoke.yml` | relevant pull request, main push, manual | Public release verification plus real canonical and alternate-versification builds |
-| `integration.yml` | relevant pull request, main push, monthly, manual | Real builds of Clarke, TSK, MHCC, Luther, StrongsGreek, StrongsHebrew, and Easton; validates the generated trees |
-| `build.yml` | monthly, manual | Complete selected resource build; conditionally signs and pushes both output repositories |
+| `integration.yml` | relevant pull request, main push, monthly, manual | Real builds of Clarke, TSK, MHCC, Luther, Sentiment, VarApp, StrongsGreek, StrongsHebrew, and Easton; validates the generated trees |
+| `build.yml` | monthly, manual | Builds every selected module, conditionally publishes validated updates, and preserves reports and generated output |
 
 The production workflow always builds. It pushes only when the `push` input is
 enabled and all six publication values are non-empty. With incomplete publication
 secrets it emits a notice, produces the local build and report, and skips Git setup,
 cloning, commits, and pushes.
+
+A module failure does not discard completed compilation. The run records failed and
+retained modules, continues independent work, and updates the resources that can
+safely be published. The workflow summary highlights a partial outcome and links it
+to downloadable JSON/Markdown diagnostics and the full build log (30 days). Separate
+artifacts retain generated commentary and dictionary output for 14 days, including
+when Git publication fails. Artifacts contain no repository checkout or signing keys.
+Read [Build reports and recovery](docs/build-recovery.md) before reusing an artifact:
+a checkpoint preserved before tree finalization is not yet a complete API.
 
 No extractor-access secret is required. `binary-smoke.yml` proves that the pinned
 public release can be installed, verified, and used without authentication.

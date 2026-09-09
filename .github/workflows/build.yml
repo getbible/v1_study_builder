@@ -91,6 +91,7 @@ jobs:
           STUDY_BUILDER_COMMENTARIES_REPO: ${{ secrets.GETBIBLE_COMMENTARIES_REPO || 'git@github.com:getbible/commentaries.git' }}
           STUDY_BUILDER_DICTIONARIES_REPO: ${{ secrets.GETBIBLE_DICTIONARIES_REPO || 'git@github.com:getbible/dictionaries.git' }}
           STUDY_BUILDER_SIGN_COMMITS: ${{ steps.publication.outputs.enabled }}
+          PYTHONUNBUFFERED: "1"
         shell: bash
         run: |
           args=(build --resource "$RESOURCE")
@@ -100,12 +101,46 @@ jobs:
           if [[ "$PUBLISH" == "true" ]]; then
             args+=(--pull --push)
           fi
-          study-builder "${args[@]}"
+          mkdir -p .work/reports
+          set -o pipefail
+          study-builder "${args[@]}" 2>&1 | tee .work/build.raw.log
+      - name: Summarize build and preserve diagnostics
+        if: always()
+        env:
+          STUDY_BUILDER_COMMENTARIES_REPO: ${{ secrets.GETBIBLE_COMMENTARIES_REPO || 'git@github.com:getbible/commentaries.git' }}
+          STUDY_BUILDER_DICTIONARIES_REPO: ${{ secrets.GETBIBLE_DICTIONARIES_REPO || 'git@github.com:getbible/dictionaries.git' }}
+        shell: bash
+        run: |
+          python scripts/build_summary.py
       - name: Upload build report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: study-builder-report-${{ github.run_id }}
-          path: .work/reports/latest.json
+          name: study-builder-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .work/reports/latest.json
+            .work/reports/summary.md
+            .work/reports/build.log
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 30
+      - name: Preserve generated commentary output
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: study-builder-commentaries-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .work/generated/commentaries/v1/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          compression-level: 6
+          retention-days: 14
+      - name: Preserve generated dictionary output
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: study-builder-dictionaries-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .work/generated/dictionaries/v1/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          compression-level: 6
+          retention-days: 14

@@ -48,6 +48,10 @@ jobs:
             module: MHCC
           - resource: commentaries
             module: Luther
+          - resource: commentaries
+            module: Sentiment
+          - resource: commentaries
+            module: VarApp
           - resource: dictionaries
             module: StrongsGreek
           - resource: dictionaries
@@ -81,9 +85,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ matrix.resource }}-${{ matrix.module }}-${{ github.run_id }}
+          name: ${{ matrix.resource }}-${{ matrix.module }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             dist/
             .work/reports/latest.json
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 7
