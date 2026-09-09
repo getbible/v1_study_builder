@@ -675,7 +675,8 @@ class ReferenceResolver:
             if not candidate or candidate[:1].isdigit() and " " not in candidate:
                 continue
             try:
-                resolved = self.checker.ref(f"{candidate} 1", self.translation)
+                chapter = next(iter(self.canon.chapter_numbers(book)), 1)
+                resolved = self.checker.ref(f"{candidate} {chapter}", self.translation)
             except ReferenceValidationError:
                 continue
             if resolved.book == book:
@@ -689,7 +690,7 @@ class ReferenceResolver:
 
         A chapter the book does not have, and a verse a chapter does not have, are not
         published: the API has nothing at that address. A range that crosses a chapter
-        boundary is expanded with the API's verse counts, so "Nu 16:1-17:13" names every
+        boundary is expanded with the API's actual coordinates, so "Nu 16:1-17:13" names every
         verse it covers, once per chapter.
         """
         if not self.canon.has_book(book) or book not in self.registry.by_number:
@@ -708,35 +709,56 @@ class ReferenceResolver:
             assert isinstance(current, set)
             current.update(numbers)
 
-        count = self.canon.chapter_count(book) or 0
+        available_chapters = self.canon.chapter_numbers(book)
         for span in spans:
-            if not self.canon.has_chapter(book, span.chapter):
+            if type(span.chapter) is not int or span.chapter < 1:
                 continue
             if span.verse is None:
-                last = min(span.end_chapter or span.chapter, count)
-                for chapter in range(span.chapter, max(last, span.chapter) + 1):
-                    whole(chapter)
+                last = max(span.end_chapter or span.chapter, span.chapter)
+                for chapter in available_chapters:
+                    if span.chapter <= chapter <= last:
+                        whole(chapter)
                 continue
-            if span.verse < 1:
+            if type(span.verse) is not int or span.verse < 1:
                 continue
-            limit = self.canon.verse_count(book, span.chapter) or 0
-            if span.end_chapter is None or span.end_chapter == span.chapter:
-                if span.verse > limit:
-                    continue
+            if span.end_chapter is None or span.end_chapter <= span.chapter:
                 last = span.end_verse if span.end_verse and span.end_verse >= span.verse else None
-                verses(span.chapter, range(span.verse, min(last or span.verse, limit) + 1))
+                if span.end_chapter is not None and span.end_chapter < span.chapter:
+                    last = None
+                verses(
+                    span.chapter,
+                    (
+                        verse
+                        for verse in self.canon.verse_numbers(book, span.chapter)
+                        if span.verse <= verse <= (last or span.verse)
+                    ),
+                )
                 continue
-            if span.end_chapter < span.chapter or span.end_chapter > count:
-                if span.verse <= limit:
-                    verses(span.chapter, [span.verse])
-                continue
-            if span.verse <= limit:
-                verses(span.chapter, range(span.verse, limit + 1))
-            for chapter in range(span.chapter + 1, span.end_chapter):
-                whole(chapter)
-            end_limit = self.canon.verse_count(book, span.end_chapter) or 0
-            last = min(max(span.end_verse or 1, 1), end_limit)
-            verses(span.end_chapter, range(1, last + 1))
+            # Intersect the written range with real coordinates. Missing chapters,
+            # missing starting verses and interior holes must never be manufactured.
+            for chapter in available_chapters:
+                if not span.chapter <= chapter <= span.end_chapter:
+                    continue
+                if span.chapter < chapter < span.end_chapter:
+                    whole(chapter)
+                elif chapter == span.chapter:
+                    verses(
+                        chapter,
+                        (
+                            verse
+                            for verse in self.canon.verse_numbers(book, chapter)
+                            if verse >= span.verse
+                        ),
+                    )
+                else:
+                    verses(
+                        chapter,
+                        (
+                            verse
+                            for verse in self.canon.verse_numbers(book, chapter)
+                            if verse <= max(span.end_verse or 1, 1)
+                        ),
+                    )
 
         osis = self.registry.by_number[book].osis[0]
         name = self.name(book)
@@ -1091,7 +1113,7 @@ class _Scan:
             verse is None
             and chapter != 1
             and book is not None
-            and self.aliases.canon.chapter_count(book) == 1
+            and self.aliases.canon.chapter_numbers(book) == (1,)
         ):
             chapter, verse = 1, chapter
         spans: list[Span] = []

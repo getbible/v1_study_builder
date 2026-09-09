@@ -25,7 +25,7 @@ jobs:
       - name: Lint and format
         run: |
           python -m ruff check src tests scripts
-          python -m ruff format --check src tests scripts
+          python -m ruff format --check --diff src tests scripts
       - name: Unit and contract tests
         run: python -m pytest --cov=study_builder --cov-report=term-missing
       - name: Verify command contracts
