@@ -40,7 +40,11 @@ retained in the internal source record. Validated entries remain disk-backed and
 writers stream them; do not restore whole-module entry or commentary collections in
 memory. Composed documents are streamed from the documents they embed, never built
 up as one object. A missing footer, failed digest, failed artifact, unsupported major
-contract, or extractor error blocks all publication.
+contract, or extractor error blocks publication of that module. Keep each module's
+writes isolated until validation finishes; a failed module must never contaminate a
+successful module's output. Record the failure and continue independent modules.
+Shared configuration, extractor-installation, policy, and path-safety failures remain
+hard failures; resilience never permits bypassing these checks.
 
 ## Output stability
 
@@ -68,7 +72,7 @@ written canonically in a form the Query API accepts, and `text` when the citatio
 located in the entry text. They are produced by one engine,
 `src/study_builder/references.py`, from markup and prose alike, and every coordinate it
 publishes exists in the Bible API. The shape of the Bible — which books a versification
-has, their chapter and verse counts, their names in a language — is read from
+has, their actual chapter and verse numbers, their names in a language — is read from
 `api.getbible.net/v2` by `src/study_builder/bible.py` and cached under `.work/bible/`
 with the published hash; never carry chapter or verse counts, or per-language book
 names, in this repository. `conf/book_registry.json` holds only the book numbering and
@@ -97,8 +101,21 @@ A module identifier may never collide with a document at the `v1/` root; see
 `RESERVED_MODULE_IDS`. Any breaking path or document change requires a new tree
 version; do not silently mutate v1.
 
-Generated repositories are replace-only outputs. A partial `--module` build may be
-used for tests but must never be pushed.
+Generated repositories are replace-only outputs. A partial `--module` selection may
+be used for tests but must never be pushed. A full selection may finish with isolated
+module failures: publish the validated updates and retain each failed module's
+previous validated output, keeping its original metadata and catalog entry. Never
+copy unverified prior data, relabel it as newly built, or replace an all-failed
+resource with an empty tree. If a required prior module cannot be validated, block
+that resource while preserving completed work from the other resource.
+
+Checkpoint `.work/reports/latest.json` as work completes and after publication.
+Publish the compilation report as `v1/build-report.json`, validate it against its
+schema, describe it in OpenAPI, and include it in `hashes.json`. Failed, retained,
+and newly built modules must be distinguishable. The public snapshot describes
+compilation, while the local report also records publication errors; it must never
+claim that a push succeeded before it happened. Keep generated work and upload
+reports/logs/output artifacts even if publication fails. See `docs/build-recovery.md`.
 
 ## Commits
 
@@ -118,8 +135,9 @@ python -m pytest
 ```
 
 The live integration workflow additionally installs the pinned release and builds
-Clarke, TSK, MHCC, Luther, StrongsGreek, StrongsHebrew, and Easton from CrossWire
-packages. Luther is the large-corpus memory regression module.
+Clarke, TSK, MHCC, Luther, Sentiment, VarApp, StrongsGreek, StrongsHebrew, and Easton
+from CrossWire packages. Luther is the large-corpus memory regression module;
+Sentiment and VarApp exercise the sparse NRSVA Bible shape.
 
 ## Releases and secrets
 
