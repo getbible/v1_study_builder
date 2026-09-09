@@ -31,6 +31,7 @@ SCHEMA_NAMES: dict[str, tuple[str, ...]] = {
         "commentary-book",
         "commentary",
         "build",
+        "build-report",
         "hashes",
     ),
     "dictionaries": (
@@ -40,6 +41,7 @@ SCHEMA_NAMES: dict[str, tuple[str, ...]] = {
         "dictionary-entry",
         "dictionary",
         "build",
+        "build-report",
         "hashes",
     ),
 }
@@ -61,7 +63,15 @@ this one included, and is therefore the complete list of paths the tree contains
 Bible API its scripture references were resolved against. `schema/` holds the JSON
 Schema of every document type; the same schemas are embedded under `components` here.
 A document is byte-stable between builds while its module is unchanged; only the
-catalog and `build.json` carry the build time.
+catalog, `build.json` and `build-report.json` carry the build time.
+
+**Build health.** `build-report.json` records the compilation outcome: `success`
+means every approved module built, and `partial` means the report lists failures
+alongside successful modules. `retained` identifies modules kept from a previous
+verified tree because their rebuild failed. A failed new module has no placeholder
+entry. The report is captured before publication; the workflow artifact additionally
+records later repository or publication errors. Check this report when deciding
+whether the tree contains a newly built or retained copy of a module.
 
 **Scripture references.** `references` on an entry are the passages it cites,
 resolved to GetBible coordinates: `book`, `chapter` and `verse`, with `verses` when
@@ -273,6 +283,16 @@ def _tree_paths(kind: ResourceKind, names: tuple[str, ...]) -> dict[str, Any]:
             "the modules were selected from and the Bible API the references were "
             "resolved against.",
             _ref("build"),
+        ),
+        "/v1/build-report.json": _operation(
+            "getBuildReport",
+            "tree",
+            "The compilation outcome and module failures",
+            "The build status, successfully rebuilt modules, failures with their stage "
+            "and reason, and previously verified modules retained after a failed rebuild. "
+            "This snapshot describes compilation; the workflow report also records later "
+            "publication errors.",
+            _ref("build-report"),
         ),
         "/v1/hashes.json": _operation(
             "getHashes",

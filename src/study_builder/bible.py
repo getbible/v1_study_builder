@@ -5,7 +5,8 @@ Every scripture reference the builder publishes points into Bible API coordinate
 book number, a chapter, and usually verses. Whether such a coordinate exists is not a
 property of the module being converted, nor of this repository, but of the Bible as
 the API publishes it. So the shape of the Bible — which books a versification has,
-which chapter and verse numbers each book has, and what the books are called in a language — is read from the API's own documents:
+which chapter and verse numbers each book has, and what the books are called in a
+language — is read from the API's own documents:
 
 - ``translations.json`` lists every translation with its language and versification;
 - ``{translation}/books.json`` lists a translation's books with their numbers and names;
@@ -482,6 +483,10 @@ def _parse_books_index(data: Any, abbreviation: str) -> dict[int, str]:
     return names
 
 
+def _verse_number(verse: Any) -> Any:
+    return verse.get("verse") if isinstance(verse, dict) else None
+
+
 def _coordinate(value: Any, maximum: int, context: str) -> int:
     if type(value) is not int or not 1 <= value <= maximum:
         raise BibleApiError(f"{context} has an invalid number: {value!r}")
@@ -508,10 +513,7 @@ def _chapter_shape(chapters: Any, context: str, *, cached: bool = False) -> list
             raise BibleApiError(f"{context} chapter {number} has too many verses")
         numbers: set[int] = set()
         for verse in verses:
-            if cached:
-                value = verse
-            else:
-                value = verse.get("verse") if isinstance(verse, dict) else None
+            value = verse if cached else _verse_number(verse)
             coordinate = _coordinate(value, MAX_VERSES, f"{context} chapter {number} verse number")
             if coordinate in numbers:
                 raise BibleApiError(f"{context} chapter {number} repeats verse {coordinate}")

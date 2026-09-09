@@ -53,6 +53,7 @@ def test_every_document_of_the_tree_is_described(schemas_dir: Path) -> None:
     assert list(commentaries["paths"]) == [
         "/v1/commentaries.json",
         "/v1/build.json",
+        "/v1/build-report.json",
         "/v1/hashes.json",
         "/v1/openapi.json",
         "/v1/schema/{document}.json",
@@ -66,6 +67,7 @@ def test_every_document_of_the_tree_is_described(schemas_dir: Path) -> None:
     assert list(dictionaries["paths"]) == [
         "/v1/dictionaries.json",
         "/v1/build.json",
+        "/v1/build-report.json",
         "/v1/hashes.json",
         "/v1/openapi.json",
         "/v1/schema/{document}.json",

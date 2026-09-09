@@ -120,8 +120,6 @@ def parser() -> argparse.ArgumentParser:
 
 
 def _build(args: argparse.Namespace) -> int:
-    if args.offline and args.refresh:
-        raise ValueError("--offline and --refresh cannot be combined")
     config = PipelineConfig(
         root=repository_root(),
         work_dir=args.work_dir.resolve(),
@@ -149,6 +147,12 @@ def _build(args: argparse.Namespace) -> int:
     )
     report = BuildPipeline(config).run()
     print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
+    if report.status == "partial":
+        logging.getLogger(__name__).warning(
+            "Partial build completed: %s module(s) failed; review %s",
+            len(report.failed),
+            config.work_dir / "reports" / "latest.json",
+        )
     return 0
 
 

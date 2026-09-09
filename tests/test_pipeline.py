@@ -31,7 +31,7 @@ def pipeline(tmp_path, project_root, bible_tree) -> BuildPipeline:
 
 def test_reserved_identifiers_cover_every_root_document() -> None:
     # A module directory and its whole-module document share the v1 root with these.
-    for name in ("commentaries", "dictionaries", "build", "hashes", "schema"):
+    for name in ("commentaries", "dictionaries", "build", "build-report", "hashes", "openapi", "schema"):
         assert name in RESERVED_MODULE_IDS
 
 
@@ -55,6 +55,7 @@ def test_schemas_are_published_beside_the_data(pipeline, tmp_path) -> None:
         "commentary-chapter.json",
         "commentary-metadata.json",
         "build.json",
+        "build-report.json",
         "hashes.json",
     }
 
@@ -68,6 +69,7 @@ def test_schemas_are_published_beside_the_data(pipeline, tmp_path) -> None:
         "dictionary-index.json",
         "dictionary-metadata.json",
         "build.json",
+        "build-report.json",
         "hashes.json",
     }
 
