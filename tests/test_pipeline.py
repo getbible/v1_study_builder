@@ -31,7 +31,15 @@ def pipeline(tmp_path, project_root, bible_tree) -> BuildPipeline:
 
 def test_reserved_identifiers_cover_every_root_document() -> None:
     # A module directory and its whole-module document share the v1 root with these.
-    for name in ("commentaries", "dictionaries", "build", "build-report", "hashes", "openapi", "schema"):
+    for name in (
+        "commentaries",
+        "dictionaries",
+        "build",
+        "build-report",
+        "hashes",
+        "openapi",
+        "schema",
+    ):
         assert name in RESERVED_MODULE_IDS
 
 

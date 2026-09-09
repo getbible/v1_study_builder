@@ -353,7 +353,9 @@ class BuildPipeline:
         if not any(report.built.values()):
             raise RuntimeError("No modules built successfully; existing output remains unchanged")
         if not publishable:
-            raise RuntimeError("No resource can be replaced safely; existing output remains unchanged")
+            raise RuntimeError(
+                "No resource can be replaced safely; existing output remains unchanged"
+            )
 
         report.status = "partial" if report.failed or report.errors else "success"
         report.completed_at = utc_now()
@@ -450,8 +452,7 @@ class BuildPipeline:
         module_destination = destination / module_id
         whole_destination = destination / f"{module_id}.json"
         if any(
-            path.exists() or path.is_symlink()
-            for path in (module_destination, whole_destination)
+            path.exists() or path.is_symlink() for path in (module_destination, whole_destination)
         ):
             raise RuntimeError(f"Refusing to overwrite promoted module {module_id}")
         os.replace(stage / module_id, module_destination)

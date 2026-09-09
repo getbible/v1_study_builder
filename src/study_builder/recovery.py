@@ -173,6 +173,66 @@ class PreviousTree:
         self._check_id(module_id)
         return module_id in self.records
 
+    def _linked_inventory(
+        self, stage: Path, module_id: str, record: dict[str, Any], expected: set[str]
+    ) -> None:
+        """Check addressable parts through the small index, never parse composed modules."""
+        prefix = "commentary" if self.kind == "commentaries" else "dictionary"
+        index_name = "books" if self.kind == "commentaries" else "index"
+        index = self._document(stage / module_id / f"{index_name}.json", f"{prefix}-{index_name}")
+        if index[prefix] != module_id or any(
+            index[key] != record[key] for key in ("name", "language")
+        ):
+            raise RecoveryError(f"Previous index identity disagrees: {module_id}")
+        linked = {
+            f"{module_id}.json",
+            f"{module_id}/metadata.json",
+            f"{module_id}/{index_name}.json",
+        }
+        if self.kind == "dictionaries":
+            entries = index["entries"]
+            identifiers: set[str] = set()
+            for entry in entries:
+                entry_id = entry["id"]
+                path = f"{module_id}/{entry_id}.json"
+                _canonical_path(path)
+                if (
+                    "/" in entry_id
+                    or entry_id.casefold() in identifiers
+                    or entry_id.casefold() in {"index", "metadata"}
+                ):
+                    raise RecoveryError(f"Unsafe or duplicate previous entry: {entry_id!r}")
+                identifiers.add(entry_id.casefold())
+                linked.add(path)
+            counts = {
+                "entry_count": len(entries),
+                "unique_key_count": len({entry["key"].casefold() for entry in entries}),
+            }
+            if any(index[key] != value for key, value in counts.items()):
+                raise RecoveryError(f"Previous dictionary index counts disagree: {module_id}")
+        else:
+            books = index["books"]
+            book_numbers: set[int] = set()
+            for book in books:
+                number = book["book"]
+                chapters = book["chapters"]
+                if number in book_numbers or len(chapters) != len(set(chapters)):
+                    raise RecoveryError(f"Duplicate previous book or chapter: {module_id}")
+                book_numbers.add(number)
+                linked.add(f"{module_id}/{number}.json")
+                linked.update(f"{module_id}/{number}/{chapter}.json" for chapter in chapters)
+            counts = {
+                "book_count": len(books),
+                "chapter_count": sum(len(book["chapters"]) for book in books),
+                "entry_count": sum(book["entry_count"] for book in books),
+            }
+            if index["book_count"] != counts["book_count"]:
+                raise RecoveryError(f"Previous books index counts disagree: {module_id}")
+        if any(record[key] != value for key, value in counts.items()):
+            raise RecoveryError(f"Previous catalog and index counts disagree: {module_id}")
+        if linked != expected:
+            raise RecoveryError(f"Previous index links do not match module files: {module_id}")
+
     def retain(self, module_id: str, destination_root: Path) -> dict[str, Any]:
         """Copy one verified module, never root metadata or another module's files.
 
@@ -215,6 +275,7 @@ class PreviousTree:
             record = self.records[module_id]
             if any(metadata.get(key) != value for key, value in record.items()):
                 raise RecoveryError(f"Previous catalog and metadata disagree: {module_id}")
+            self._linked_inventory(stage, module_id, record, expected)
             if (stage / complete).stat().st_size != record["bytes"]:
                 raise RecoveryError(f"Previous whole-module size disagrees: {module_id}")
             os.replace(stage / module_id, destination)
