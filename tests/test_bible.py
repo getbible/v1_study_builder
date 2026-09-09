@@ -54,10 +54,17 @@ def test_canon_keeps_only_the_shape_of_a_translation(bible_api) -> None:
     assert books[19].verse_count(119) == 176
     assert 73 not in books
     cached = json.loads((bible_api.cache_dir / "shape" / "kjv.json").read_text(encoding="utf-8"))
-    assert cached["schema"] == "study-builder-bible-canon-v1"
+    assert cached["schema"] == "study-builder-bible-canon-v2"
     assert cached["sha"] == bible_api.translations()["kjv"].sha
     assert "text" not in json.dumps(cached)
-    assert cached["books"][0] == {"number": 1, "name": "Genesis", "verses": list(books[1].verses)}
+    assert cached["books"][0] == {
+        "number": 1,
+        "name": "Genesis",
+        "chapters": [
+            {"chapter": chapter, "verses": list(verses)}
+            for chapter, verses in books[1].chapters.items()
+        ],
+    }
 
 
 def test_an_unchanged_hash_does_not_download_the_translation_again(remote) -> None:
@@ -79,7 +86,7 @@ def test_a_changed_hash_refreshes_the_cached_shape(remote, bible_tree) -> None:
     cache = api.cache_dir / "shape" / "klv.json"
     stale = json.loads(cache.read_text(encoding="utf-8"))
     stale["sha"] = "0" * 40
-    stale["books"][0]["verses"] = [1]
+    stale["books"][0]["chapters"] = [{"chapter": 1, "verses": [1]}]
     cache.write_text(json.dumps(stale), encoding="utf-8")
 
     fresh = BibleApi(api.location, cache_dir=api.cache_dir, http=http).canon("klv")
@@ -250,7 +257,7 @@ def test_a_cached_duplicate_book_cannot_override_the_validated_shape(tmp_path) -
     BibleApi(tree, cache_dir=cache).canon("klv")
     shape = cache / "shape" / "klv.json"
     record = json.loads(shape.read_text(encoding="utf-8"))
-    record["books"].append({**record["books"][0], "verses": [1]})
+    record["books"].append(dict(record["books"][0]))
     shape.write_text(json.dumps(record), encoding="utf-8")
 
     offline = BibleApi("https://unreachable.test/v2", cache_dir=cache, offline=True)

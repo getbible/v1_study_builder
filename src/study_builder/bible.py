@@ -5,13 +5,12 @@ Every scripture reference the builder publishes points into Bible API coordinate
 book number, a chapter, and usually verses. Whether such a coordinate exists is not a
 property of the module being converted, nor of this repository, but of the Bible as
 the API publishes it. So the shape of the Bible — which books a versification has,
-how many chapters each book has, how many verses each chapter has, and what the books
-are called in a language — is read from the API's own documents:
+which chapter and verse numbers each book has, and what the books are called in a language — is read from the API's own documents:
 
 - ``translations.json`` lists every translation with its language and versification;
 - ``{translation}/books.json`` lists a translation's books with their numbers and names;
 - ``{translation}.json`` carries the translation, from which only the chapter and verse
-  counts are kept; ``{translation}.sha`` is its content hash.
+  coordinates are kept; ``{translation}.sha`` is its content hash.
 
 The builder never publishes scripture text. It reads a translation once to learn its
 shape, verifies the download against the published hash, keeps only the shape in its
@@ -26,8 +25,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -35,7 +36,7 @@ from study_builder.http import HttpClient
 from study_builder.util import read_json, utc_now, write_json
 
 DEFAULT_BIBLE_API = "https://api.getbible.net/v2"
-CANON_SCHEMA = "study-builder-bible-canon-v1"
+CANON_SCHEMA = "study-builder-bible-canon-v2"
 DEFAULT_VERSIFICATION = "KJV"
 
 _SHA1 = re.compile(r"^[0-9a-f]{40}$")
@@ -63,20 +64,38 @@ class Translation:
 
 @dataclass(frozen=True)
 class CanonBook:
-    """One book as a translation publishes it: its name and the verses of each chapter."""
+    """One book's actual chapter and verse coordinates, including any numbering gaps."""
 
     number: int
     name: str
-    verses: tuple[int, ...]
+    chapters: Mapping[int, tuple[int, ...]]
     translation: str
+
+    def __post_init__(self) -> None:
+        # A cached shape is shared by many modules; a caller must not alter its membership.
+        object.__setattr__(
+            self,
+            "chapters",
+            MappingProxyType(
+                {chapter: tuple(verses) for chapter, verses in sorted(self.chapters.items())}
+            ),
+        )
 
     @property
     def chapter_count(self) -> int:
-        return len(self.verses)
+        return len(self.chapters)
+
+    def chapter_numbers(self) -> tuple[int, ...]:
+        return tuple(self.chapters)
+
+    def verse_numbers(self, chapter: int) -> tuple[int, ...]:
+        if type(chapter) is not int:
+            return ()
+        return self.chapters.get(chapter, ())
 
     def verse_count(self, chapter: int) -> int | None:
-        if 1 <= chapter <= len(self.verses):
-            return self.verses[chapter - 1]
+        if type(chapter) is int and chapter in self.chapters:
+            return len(self.chapters[chapter])
         return None
 
 
@@ -107,23 +126,30 @@ class Canon:
         self.versification = versification
 
     def has_book(self, book: int) -> bool:
-        return book in self.books
+        return type(book) is int and book in self.books
 
     def chapter_count(self, book: int) -> int | None:
-        found = self.books.get(book)
+        found = self.books.get(book) if type(book) is int else None
         return found.chapter_count if found else None
 
     def verse_count(self, book: int, chapter: int) -> int | None:
-        found = self.books.get(book)
+        found = self.books.get(book) if type(book) is int else None
         return found.verse_count(chapter) if found else None
 
+    def chapter_numbers(self, book: int) -> tuple[int, ...]:
+        found = self.books.get(book) if type(book) is int else None
+        return found.chapter_numbers() if found else ()
+
+    def verse_numbers(self, book: int, chapter: int) -> tuple[int, ...]:
+        found = self.books.get(book) if type(book) is int else None
+        return found.verse_numbers(chapter) if found else ()
+
     def has_chapter(self, book: int, chapter: int) -> bool:
-        count = self.chapter_count(book)
-        return count is not None and 1 <= chapter <= count
+        found = self.books.get(book) if type(book) is int else None
+        return found is not None and type(chapter) is int and chapter in found.chapters
 
     def has_verse(self, book: int, chapter: int, verse: int) -> bool:
-        count = self.verse_count(book, chapter)
-        return count is not None and 1 <= verse <= count
+        return type(verse) is int and verse in self.verse_numbers(book, chapter)
 
     def name(self, book: int) -> str | None:
         return self.names.get(book)
@@ -245,7 +271,7 @@ class BibleApi:
         return names
 
     def canon(self, abbreviation: str) -> dict[int, CanonBook]:
-        """The shape of one translation: every book with the verse count of every chapter."""
+        """The shape of one translation: the actual chapter and verse numbers of every book."""
         if abbreviation in self._canons:
             return self._canons[abbreviation]
         abbreviation = _abbreviation(abbreviation)
@@ -265,7 +291,7 @@ class BibleApi:
             int(item["number"]): CanonBook(
                 int(item["number"]),
                 str(item["name"]),
-                tuple(int(count) for count in item["verses"]),
+                {chapter["chapter"]: tuple(chapter["verses"]) for chapter in item["chapters"]},
                 abbreviation,
             )
             for item in record["books"]
@@ -310,6 +336,7 @@ class BibleApi:
             raise BibleApiError(
                 f"Bible API translation {abbreviation} does not match its own books index"
             )
+        ordered_books = [books[number] for number in sorted(books)]
         return {
             "schema": CANON_SCHEMA,
             "translation": abbreviation,
@@ -317,7 +344,8 @@ class BibleApi:
             "checked_at": utc_now(),
             "language": translation.language if translation else "",
             "versification": translation.versification if translation else "",
-            "books": [books[number] for number in sorted(books)],
+            "books": ordered_books,
+            "shape_sha256": _shape_digest(ordered_books),
         }
 
     # -- choosing translations for a module -----------------------------------
@@ -380,7 +408,16 @@ class BibleApi:
         books: dict[int, CanonBook] = {}
         for abbreviation in shape:
             for number, book in self.canon(abbreviation).items():
-                books.setdefault(number, book)
+                previous = books.get(number)
+                if previous is None:
+                    books[number] = book
+                    continue
+                # The Apocrypha companion may also supply coordinates missing from a
+                # shared book. Union only coordinates actually published by either source.
+                chapters = dict(previous.chapters)
+                for chapter, verses in book.chapters.items():
+                    chapters[chapter] = tuple(sorted(set(chapters.get(chapter, ())) | set(verses)))
+                books[number] = CanonBook(number, previous.name, chapters, previous.translation)
         names = self.book_names(names_translation) if names_translation else {}
         wanted = (versification or DEFAULT_VERSIFICATION).strip() or DEFAULT_VERSIFICATION
         return Canon(
@@ -445,8 +482,46 @@ def _parse_books_index(data: Any, abbreviation: str) -> dict[int, str]:
     return names
 
 
+def _coordinate(value: Any, maximum: int, context: str) -> int:
+    if type(value) is not int or not 1 <= value <= maximum:
+        raise BibleApiError(f"{context} has an invalid number: {value!r}")
+    return value
+
+
+def _chapter_shape(chapters: Any, context: str, *, cached: bool = False) -> list[dict[str, Any]]:
+    """Validate and retain coordinates; array positions never imply a number."""
+    if not isinstance(chapters, list) or not chapters:
+        raise BibleApiError(f"{context} has no chapters array")
+    if len(chapters) > MAX_CHAPTERS:
+        raise BibleApiError(f"{context} has too many chapters")
+    shape: dict[int, list[int]] = {}
+    for chapter in chapters:
+        if not isinstance(chapter, dict):
+            raise BibleApiError(f"{context} has a non-object chapter")
+        number = _coordinate(chapter.get("chapter"), MAX_CHAPTERS, f"{context} chapter")
+        if number in shape:
+            raise BibleApiError(f"{context} repeats chapter {number}")
+        verses = chapter.get("verses")
+        if not isinstance(verses, list):
+            raise BibleApiError(f"{context} chapter {number} has no verses array")
+        if len(verses) > MAX_VERSES:
+            raise BibleApiError(f"{context} chapter {number} has too many verses")
+        numbers: set[int] = set()
+        for verse in verses:
+            if cached:
+                value = verse
+            else:
+                value = verse.get("verse") if isinstance(verse, dict) else None
+            coordinate = _coordinate(value, MAX_VERSES, f"{context} chapter {number} verse number")
+            if coordinate in numbers:
+                raise BibleApiError(f"{context} chapter {number} repeats verse {coordinate}")
+            numbers.add(coordinate)
+        shape[number] = sorted(numbers)
+    return [{"chapter": number, "verses": shape[number]} for number in sorted(shape)]
+
+
 def _shape_of(document: Any, abbreviation: str) -> dict[int, dict[str, Any]]:
-    """Reduce a translation document to the counts the builder keeps; the text is dropped."""
+    """Reduce a translation to its exact coordinates; scripture text is dropped."""
     if not isinstance(document, dict) or not isinstance(document.get("books"), list):
         raise BibleApiError(f"Bible API translation {abbreviation} carries no books array")
     books: dict[int, dict[str, Any]] = {}
@@ -457,44 +532,21 @@ def _shape_of(document: Any, abbreviation: str) -> dict[int, dict[str, Any]]:
         if number in books:
             raise BibleApiError(f"Bible API translation {abbreviation} repeats book {number}")
         name = str(book.get("name") or "").strip()
-        chapters = book.get("chapters")
-        if not name or not isinstance(chapters, list) or not chapters:
-            raise BibleApiError(
-                f"Bible API translation {abbreviation} book {number} has no name or chapters"
-            )
-        if len(chapters) > MAX_CHAPTERS:
-            raise BibleApiError(
-                f"Bible API translation {abbreviation} book {number} has too many chapters"
-            )
-        counts: list[int] = []
-        for index, chapter in enumerate(chapters, start=1):
-            if not isinstance(chapter, dict) or chapter.get("chapter") != index:
-                raise BibleApiError(
-                    f"Bible API translation {abbreviation} book {number} chapters are not "
-                    "numbered consecutively from one"
-                )
-            verses = chapter.get("verses")
-            if not isinstance(verses, list):
-                raise BibleApiError(
-                    f"Bible API translation {abbreviation} book {number} chapter {index} "
-                    "has no verses array"
-                )
-            numbers = [item.get("verse") if isinstance(item, dict) else None for item in verses]
-            if any(
-                isinstance(n, bool) or not isinstance(n, int) or not 1 <= n <= MAX_VERSES
-                for n in numbers
-            ):
-                raise BibleApiError(
-                    f"Bible API translation {abbreviation} book {number} chapter {index} "
-                    "has an invalid verse number"
-                )
-            # Verse numbers are trusted to be dense; the count is the highest number, so a
-            # translation that omits a verse still lets a reference to the last verse resolve.
-            counts.append(max(numbers) if numbers else 0)
-        books[number] = {"number": number, "name": name, "verses": counts}
+        if not name:
+            raise BibleApiError(f"Bible API translation {abbreviation} book {number} has no name")
+        chapters = _chapter_shape(
+            book.get("chapters"), f"Bible API translation {abbreviation} book {number}"
+        )
+        books[number] = {"number": number, "name": name, "chapters": chapters}
     if not books:
         raise BibleApiError(f"Bible API translation {abbreviation} has no books")
     return books
+
+
+def _shape_digest(books: list[dict[str, Any]]) -> str:
+    """Detect local cache corruption independently of the upstream translation hash."""
+    payload = json.dumps(books, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _read_canon_cache(path: Path | None, abbreviation: str) -> dict[str, Any] | None:
@@ -511,9 +563,8 @@ def _read_canon_cache(path: Path | None, abbreviation: str) -> dict[str, Any] | 
         or not isinstance(record.get("sha"), str)
         or not _SHA1.fullmatch(record["sha"])
         or not isinstance(record.get("books"), list)
+        or not record["books"]
     ):
-        return None
-    if not record["books"]:
         return None
     numbers: set[int] = set()
     try:
@@ -523,21 +574,13 @@ def _read_canon_cache(path: Path | None, abbreviation: str) -> dict[str, Any] | 
                 return None
             numbers.add(number)
             name = item["name"]
-            counts = item["verses"]
-            if (
-                not isinstance(name, str)
-                or not name.strip()
-                or not isinstance(counts, list)
-                or not counts
-                or len(counts) > MAX_CHAPTERS
-                or not all(
-                    isinstance(count, int)
-                    and not isinstance(count, bool)
-                    and 0 <= count <= MAX_VERSES
-                    for count in counts
-                )
-            ):
+            if not isinstance(name, str) or not name.strip():
                 return None
+            chapters = _chapter_shape(item["chapters"], "cached Bible shape", cached=True)
+            if chapters != item["chapters"]:
+                return None
+        if record.get("shape_sha256") != _shape_digest(record["books"]):
+            return None
     except (BibleApiError, KeyError, TypeError):
         return None
     return record
