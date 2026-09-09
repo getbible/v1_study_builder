@@ -344,9 +344,7 @@ def test_failed_writer_never_leaks_partial_files(configured_pipeline, monkeypatc
     assert [record["id"] for record in catalog["dictionaries"]] == ["other"]
 
 
-def test_failed_resource_with_no_new_modules_is_never_replaced(
-    configured_pipeline, monkeypatch
-):
+def test_failed_resource_with_no_new_modules_is_never_replaced(configured_pipeline, monkeypatch):
     from study_builder.util import hash_tree
 
     pipeline = configured_pipeline

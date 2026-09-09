@@ -35,9 +35,25 @@ def previous(request, tmp_path, project_root, commentary_module, reference_engin
         schemas,
         references=reference_engine,
     )
+    entries = [
+        {
+            "key": key,
+            "raw": text,
+            "plain": text,
+            "html": "",
+            "verse": {
+                "osis": f"Gen.{chapter}.1",
+                "testament": 1,
+                "book": 1,
+                "chapter": chapter,
+                "verse": 1,
+            },
+        }
+        for key, chapter, text in (("Alpha", 0, "Introduction."), ("Beta", 1, "Comment."))
+    ]
     records = []
     for name in ("First", "Second"):
-        record, _ = writer.write(replace(commentary_module, name=name), NativeExport({}, []))
+        record, _ = writer.write(replace(commentary_module, name=name), NativeExport({}, entries))
         records.append(record)
     write_json(
         root / f"{kind}.json",
@@ -223,3 +239,60 @@ def test_orphan_module_cannot_be_mistaken_for_a_new_module(previous):
     _manifest(root)
     with pytest.raises(RecoveryError, match="no catalog owner"):
         _open(previous)
+
+
+@pytest.mark.parametrize("part", ["entry", "book"])
+def test_rejects_linked_file_removed_from_tree_and_manifest(previous, tmp_path, part):
+    root, kind, _ = previous
+    if kind == "dictionaries":
+        missing = root / "first" / "k-Alpha.json"
+    elif part == "book":
+        missing = root / "first" / "1.json"
+    else:
+        missing = root / "first" / "1" / "0.json"
+    missing.unlink()
+    _manifest(root)
+    destination = tmp_path / "generated"
+    with pytest.raises(RecoveryError, match="index links do not match"):
+        _open(previous).retain("first", destination)
+    assert not (destination / "first").exists()
+    _open(previous).retain("second", destination)
+
+
+def test_rejects_schema_invalid_previous_index(previous, tmp_path):
+    root, kind, _ = previous
+    index_name = "books" if kind == "commentaries" else "index"
+    write_json(root / "first" / f"{index_name}.json", {})
+    _manifest(root)
+    with pytest.raises(RecoveryError, match=f"Invalid previous {index_name}.json"):
+        _open(previous).retain("first", tmp_path / "generated")
+
+
+def test_rejects_duplicate_previous_index_paths(previous, tmp_path):
+    root, kind, _ = previous
+    index_name = "books" if kind == "commentaries" else "index"
+    path = root / "first" / f"{index_name}.json"
+    index = read_json(path)
+    if kind == "commentaries":
+        index["books"][0]["chapters"].append(0)
+    else:
+        index["entries"].append(index["entries"][0])
+    write_json(path, index)
+    _manifest(root)
+    with pytest.raises(RecoveryError, match="[Dd]uplicate"):
+        _open(previous).retain("first", tmp_path / "generated")
+
+
+def test_rejects_previous_index_catalog_count_disagreement(previous, tmp_path):
+    root, kind, _ = previous
+    index_name = "books" if kind == "commentaries" else "index"
+    path = root / "first" / f"{index_name}.json"
+    index = read_json(path)
+    if kind == "commentaries":
+        index["books"][0]["entry_count"] += 1
+    else:
+        index["entry_count"] += 1
+    write_json(path, index)
+    _manifest(root)
+    with pytest.raises(RecoveryError, match="counts disagree"):
+        _open(previous).retain("first", tmp_path / "generated")
