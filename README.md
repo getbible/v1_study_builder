@@ -324,14 +324,25 @@ clients that would otherwise read every word individually.
 
 ## Plain text
 
-Every document is plain text, and the text is laid out the way the module laid it out.
-SWORD's own plain-text reading of a ThML module collapses every line and paragraph
-break, so Torrey's lists and Smith's paragraphs would arrive as one unbroken line; for
-ThML modules the builder reads the source markup itself, keeping SWORD's conventions
-(entities, `<G3056>` Strong's markers, `[bracketed]` notes) and keeping the breaks. The
-other markup families keep their breaks in SWORD's reading already. Whatever the family,
-the published text has one space between words, no leading or trailing space on a line,
-and at most one blank line between blocks.
+Every document is plain text. For ThML, TEI, and OSIS modules, the builder projects the
+verified source markup into readable text. SWORD's stripped projections can discard
+line breaks and character references: a TEI `<lb/>` can disappear between words, and
+a Greek letter written as `&#x03B1;` can be lost. The source-aware projections preserve
+paragraphs, line breaks, senses, notes, reference labels, and Unicode characters for
+both dictionaries and commentaries. Other source formats retain SWORD's stripped text.
+
+Character references are decoded once, when markup is read. Text that is already plain
+is only whitespace-normalised, so literal ampersands and entity-like examples are not
+interpreted a second time. The extractor's `rendered_default` field is not necessarily
+HTML; the builder does not select a projection based on that field's name.
+
+The conversion preserves source wording, including multilingual text; it does not
+translate, substitute dictionary entries, or remove characters by language. These
+rendering corrections keep the existing v1 schemas, paths, identifiers, reference
+shapes, and complete-download structure. The public `text` remains a string, with one
+space between words, no leading or trailing space on a line, and at most one blank
+line between blocks. Standalone documents and the corresponding entries embedded in
+complete downloads contain identical text.
 
 Bytes the module wrote in Windows-1252 — the `’` of "David’s", the non-breaking space of
 "1 Chronicles" — are read as such rather than replaced with `�`.

@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -73,7 +74,7 @@ def test_commentary_matches_v3_book_chapter_verse_contract(
                 1,
                 1,
                 "A comment on creation.",
-                raw='<reference osisRef="John.1.1">John 1:1</reference>',
+                raw='<p>A comment on <reference osisRef="John.1.1">creation</reference>.</p>',
                 html="<p>A comment on <strong>creation</strong>.</p>",
             )
         ],
@@ -263,10 +264,20 @@ def test_collapsed_entry_keeps_every_reference_from_the_range(
         commentary_module,
         [
             entry(
-                "Gen.1.1", 1, 1, 1, shared, raw='see <reference osisRef="John.3.16">it</reference>'
+                "Gen.1.1",
+                1,
+                1,
+                1,
+                shared,
+                raw='A comment on the <reference osisRef="John.3.16">passage</reference>.',
             ),
             entry(
-                "Gen.1.2", 1, 1, 2, shared, raw='see <reference osisRef="Rom.5.8">it</reference>'
+                "Gen.1.2",
+                1,
+                1,
+                2,
+                shared,
+                raw='A comment on the <reference osisRef="Rom.5.8">passage</reference>.',
             ),
         ],
     )
@@ -333,3 +344,71 @@ def test_prose_references_inherit_the_commented_book_and_chapter(
     assert introduction["entries"][0]["references"] == [
         {"text": "1:1", "ref": "John 1:1", "osis": "John.1.1", "book": 43, "chapter": 1, "verse": 1}
     ]
+
+
+@pytest.mark.parametrize("source_type", ["TEI", "OSIS"])
+def test_source_projection_keeps_commentary_introductions_and_composed_documents(
+    tmp_path, project_root, commentary_module, source_type
+) -> None:
+    module = replace(
+        commentary_module,
+        fields={**commentary_module.fields, "sourcetype": (source_type,)},
+    )
+    reference = (
+        '<ref target="John.1.1">John 1:1</ref>'
+        if source_type == "TEI"
+        else '<reference osisRef="John.1.1">John 1:1</reference>'
+    )
+    raw = f"<p>&#945; &amp; word<lb/>中文; שָׁלוֹם.</p><p>See {reference}.</p>"
+    record, _ = write(
+        tmp_path,
+        project_root,
+        module,
+        [
+            entry("John.0.0", 43, 0, 0, "", raw="&#x03B1;"),
+            entry(
+                "John.1.0",
+                43,
+                1,
+                0,
+                "Flattened chapter introduction",
+                raw="<p>Introduction &amp; literal &amp;#x03B2;.</p>",
+            ),
+            entry("John.1.1", 43, 1, 1, "Lossy flattened projection", raw=raw),
+            entry("John.1.2", 43, 1, 2, "Lossy flattened projection", raw=raw),
+        ],
+    )
+    chapters = [
+        json.loads((tmp_path / f"testcom/43/{number}.json").read_text(encoding="utf-8"))
+        for number in (0, 1)
+    ]
+    introduction, chapter = chapters
+    assert introduction["entries"][0]["text"] == "α"
+    assert introduction["entries"][0]["verse"] == 0
+    assert chapter["entries"][0]["text"] == "Introduction & literal &#x03B2;."
+    assert chapter["entries"][0]["verse"] == 0
+    published = chapter["entries"][1]
+    assert [line for line in published["text"].splitlines() if line] == [
+        "α & word",
+        "中文; שָׁלוֹם.",
+        "See John 1:1.",
+    ]
+    assert (published["verse"], published["verses"], published["osis"]) == (1, [1, 2], "John.1.1")
+    assert published["references"] == [
+        {
+            "text": "John 1:1",
+            "ref": "John 1:1",
+            "osis": "John.1.1",
+            "book": 43,
+            "chapter": 1,
+            "verse": 1,
+        }
+    ]
+    assert set(published) == {"book", "chapter", "verse", "verses", "osis", "text", "references"}
+    book = json.loads((tmp_path / "testcom/43.json").read_text(encoding="utf-8"))
+    complete = json.loads((tmp_path / "testcom.json").read_text(encoding="utf-8"))
+    assert book["schema"] == "getbible-commentary-book-v1"
+    assert book["chapters"] == chapters
+    assert complete["schema"] == "getbible-commentary-v1"
+    assert complete["books"] == [book]
+    assert (record["book_count"], record["chapter_count"], record["entry_count"]) == (1, 2, 3)
