@@ -84,11 +84,18 @@ Where a spelling is ambiguous, the Bible's shape decides — a book must have th
 cited — never a per-module rule in code. Text is never rewritten to make a citation
 easier to recognise.
 
-Text is SWORD's `stripped` projection, except for ThML modules, whose source is projected
-by `src/study_builder/content.py` because SWORD's ThML plain filter discards every line
-break. The projection keeps SWORD's conventions; a change to it changes the words of every
-ThML module and needs the smoke builds. Every text is normalised the same way. Module bytes
-UTF-8 cannot read are decoded as Windows-1252, never replaced.
+ThML, TEI, and OSIS text is projected from the verified source markup through
+`src/study_builder/content.py`. SWORD's stripped projections can discard structural
+breaks and XML character references. Keep the source format's paragraph, line, sense,
+note, and reference semantics, and decode character references once while reading
+markup. Already-plain text must not be HTML-unescaped again. Other formats keep
+SWORD's stripped projection. The extractor's `rendered_default` value (internally
+named `html`) is not guaranteed to be HTML; it can still contain source markup.
+Never use that name to infer its format. These rules apply to dictionaries and
+commentaries alike; shared projection changes need both resources' smoke builds.
+Preserve source wording and scripts without per-entry replacements or language
+filters. Every text is normalised the same way. Module bytes UTF-8 cannot read are
+decoded as Windows-1252, never replaced. Public schemas and paths stay unchanged.
 
 Dictionary Strong's keys remain compatible with Bible API v3 (`G3056`, `H0430`).
 Repeated dictionary keys retain the unsuffixed direct path for their first

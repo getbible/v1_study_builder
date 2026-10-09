@@ -347,7 +347,9 @@ class DictionaryWriter:
         references = self.references.extract(
             content["text"],
             markup=extract_markup_references(
-                str(source.get("raw", "")), str(source.get("html", ""))
+                str(source.get("raw", "")),
+                str(source.get("html", "")),
+                source_type=self.source_type,
             ),
             book=self.references.aliases.resolve(item.key),
         )

@@ -383,6 +383,9 @@ class GetBibleSwordContractReader:
         return {
             "key": key,
             "raw": raw,
+            # Historical internal name: rendered_default can still be source
+            # markup when the extractor has no display filter installed. Select
+            # the public projection using SourceType, never this field's name.
             "html": (
                 _text(rendered, f"record[{sequence}].rendered_default", encoding)
                 if rendered is not None

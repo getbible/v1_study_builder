@@ -216,7 +216,9 @@ class CommentaryWriter:
         related = self.references.extract(
             content["text"],
             markup=extract_markup_references(
-                str(source.get("raw", "")), str(source.get("html", ""))
+                str(source.get("raw", "")),
+                str(source.get("html", "")),
+                source_type=self.source_type,
             ),
             book=book.number,
             chapter=chapter if chapter > 0 else None,

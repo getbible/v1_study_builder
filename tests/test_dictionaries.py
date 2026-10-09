@@ -379,3 +379,82 @@ def test_thml_text_keeps_its_breaks_and_markup_passages(tmp_path, project_root) 
         ("20:25", "Matthew 20:25"),
         ("Ps 131:1", "Psalms 131:1"),
     ]
+
+
+@pytest.mark.parametrize("source_type", ["TEI", "OSIS"])
+def test_source_projection_preserves_dictionary_content_and_v1_paths(
+    tmp_path, project_root, greek_dictionary_module, source_type
+) -> None:
+    if source_type == "TEI":
+        raw = (
+            "<entry><form><orth>&#x1F04;λφα</orth><lb/><pron>al-fah</pron></form>"
+            '<sense n="1"><def>First &amp; literal &amp;#x03B2;.</def> '
+            'See <ref target="John.1.1">John 1:1</ref>.</sense>'
+            '<sense n="2"><def>中文; שָׁלוֹם.</def></sense></entry>'
+        )
+        expected_lines = [
+            "ἄλφα",
+            "al-fah",
+            "1 First & literal &#x03B2;. See John 1:1.",
+            "2 中文; שָׁלוֹם.",
+        ]
+    else:
+        raw = (
+            "<div><p>&#x1F04;λφα<lb/>al-fah</p>"
+            "<p>First &amp; literal &amp;#x03B2;. "
+            'See <reference osisRef="John.1.1">John 1:1</reference>.</p>'
+            "<p>中文; שָׁלוֹם.</p></div>"
+        )
+        expected_lines = [
+            "ἄλφα",
+            "al-fah",
+            "First & literal &#x03B2;. See John 1:1.",
+            "中文; שָׁלוֹם.",
+        ]
+    record, _ = write(
+        tmp_path,
+        project_root,
+        greek_dictionary_module,
+        [
+            {"key": "03056", "raw": raw, "plain": "Lossy flattened projection", "html": raw},
+            # SWORD's plain filter can lose an entire numeric-entity definition.
+            {"key": "03056", "raw": "&#945;", "plain": "", "html": ""},
+        ],
+        metadata={"sourcetype": source_type},
+    )
+    documents = [
+        json.loads((tmp_path / f"strongsgreek/{entry_id}.json").read_text(encoding="utf-8"))
+        for entry_id in ("G3056", "G3056--2")
+    ]
+    first, second = documents
+    assert [line for line in first["text"].splitlines() if line] == expected_lines
+    assert second["text"] == "α"
+    assert [document["occurrence"] for document in documents] == [1, 2]
+    assert all(document["aliases"] == ["03056", "G3056"] for document in documents)
+    assert first["references"] == [
+        {
+            "text": "John 1:1",
+            "ref": "John 1:1",
+            "osis": "John.1.1",
+            "book": 43,
+            "chapter": 1,
+            "verse": 1,
+        }
+    ]
+    assert set(first) == {
+        "schema",
+        "dictionary",
+        "language",
+        "id",
+        "key",
+        "occurrence",
+        "aliases",
+        "text",
+        "references",
+    }
+    index = json.loads((tmp_path / "strongsgreek/index.json").read_text(encoding="utf-8"))
+    complete = json.loads((tmp_path / "strongsgreek.json").read_text(encoding="utf-8"))
+    assert [item["id"] for item in index["entries"]] == ["G3056", "G3056--2"]
+    assert complete["schema"] == "getbible-dictionary-v1"
+    assert complete["entries"] == documents
+    assert (record["entry_count"], record["unique_key_count"]) == (2, 1)
