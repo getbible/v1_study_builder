@@ -219,16 +219,22 @@ def test_normalized_utf8_bom_is_retained_as_source_content(reader) -> None:
 @pytest.mark.parametrize(
     ("encoding", "key", "expected"),
     [
-        ("Latin-1", "café λόγος".encode(), "café λόγος"),
-        ("Latin-1", b"caf\xe9\x92", "café\u0092"),
-        (None, b"caf\xe9\x92", "café\u0092"),
+        # Keys remain authoritative index bytes, not normalized body text. Keep
+        # the legacy decoder's values so upgrading does not rename v1 paths.
+        ("Latin-1", "café".encode(), "cafÃ©"),
+        ("Latin-1", b"caf\xe9\x92", "café’"),
+        (None, b"caf\xe9\x92", "café’"),
+        ("UTF-8", b"Caf\xe9", "Café"),
+        # Easton's original index key differs from its valid normalized body.
+        ("UTF-8", b"ABRAHAM\xc2\x80\x99S BOSOM", "ABRAHAM\u0080\u2122S BOSOM"),
+        ("UTF-8", "café λόγος".encode(), "café λόγος"),
         ("SCSU", b"G03056", "G03056"),
         ("SCSU", "λόγος".encode(), "λόγος"),
         ("UTF-16", b"John 1:1", "John 1:1"),
         ("UTF-16", "λόγος".encode(), "λόγος"),
     ],
 )
-def test_normalized_entry_keys_do_not_inherit_body_encoding(
+def test_normalized_entries_preserve_compatible_keys_without_redecoding_body_text(
     reader, encoding, key, expected
 ) -> None:
     records = normalized_records(encoding=encoding)
