@@ -143,6 +143,41 @@ def _text(value: Any, context: str, encoding: str = "") -> str:
     return decode_module_text(decode_byte_value(value, context), encoding)
 
 
+def _normalized_text(value: Any, context: str) -> str:
+    """Validate an extractor UTF-8 projection without reapplying its source codec."""
+    payload = decode_byte_value(value, context)
+    try:
+        # A BOM in this projection is source content, not a decoding instruction.
+        return payload.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as error:
+        raise ContractError(f"{context} must contain valid UTF-8") from error
+
+
+def _normalized_entry_key(value: Any, context: str, encoding: str) -> str:
+    """Read SWORD's index/verse key independently of the source-body encoding.
+
+    SWORD generates verse keys and uses UTF-8 dictionary key operations even when
+    the body is SCSU or UTF-16. Older single-byte dictionary indexes also exist;
+    allow their declared codec, including SWORD's default Latin-1, explicitly.
+    The extractor preserves key bytes but does not normalize or label them.
+    """
+    payload = decode_byte_value(value, context)
+    try:
+        return payload.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as error:
+        declared = encoding.strip().casefold().replace("_", "-")
+        if declared in _SINGLE_BYTE_ENCODINGS | {""}:
+            codec = "cp1252" if declared in {"cp1252", "windows-1252"} else "latin-1"
+            try:
+                return payload.decode(codec, errors="strict")
+            except UnicodeDecodeError:
+                pass
+        raise ContractError(
+            f"{context} is not a supported UTF-8 or declared single-byte SWORD key; "
+            f"the source-body encoding {encoding!r} cannot be applied to index keys"
+        ) from error
+
+
 class GetBibleSwordContractReader:
     def __init__(self, schema_path: Path, expected_contract: str) -> None:
         schema = read_json(schema_path)
@@ -364,10 +399,64 @@ class GetBibleSwordContractReader:
 
     @staticmethod
     def _adapt_entry(record: dict[str, Any], sequence: int, encoding: str = "") -> dict[str, Any]:
-        key = _text(record["key"], f"record[{sequence}].key", encoding)
-        raw = _text(record["raw"], f"record[{sequence}].raw", encoding)
-        rendered = record.get("rendered_default")
-        stripped = record.get("stripped")
+        context = f"record[{sequence}]"
+        available = record.get("projections_available")
+        if not isinstance(available, bool):
+            raise ContractError(f"{context}.projections_available must be a boolean")
+        for name in ("rendered_default", "stripped"):
+            if name not in record:
+                raise ContractError(f"{context}.{name} is missing")
+            if available:
+                # Unused legacy projections must still satisfy the byte contract.
+                decode_byte_value(record[name], f"{context}.{name}")
+            elif record[name] is not None:
+                raise ContractError(
+                    f"{context}.{name} must be null when projections are unavailable"
+                )
+        normalized = "normalized_raw" in record or "normalized_stripped" in record
+        text_error: dict[str, str] = {}
+        if normalized:
+            key = _normalized_entry_key(record["key"], f"{context}.key", encoding)
+            projections = {
+                name: (
+                    _normalized_text(record[name], f"{context}.{name}")
+                    if record.get(name) is not None
+                    else None
+                )
+                for name in ("normalized_raw", "normalized_stripped")
+            }
+            raw = projections["normalized_raw"]
+            plain = projections["normalized_stripped"]
+            if plain is not None and raw is None:
+                raise ContractError(f"{context}.normalized_stripped requires normalized_raw")
+            if raw is None:
+                # Null is a declared decoding failure, not permission to guess a
+                # codec. Defer display failure until after complete verification
+                # so the pipeline retains the extractor's warning diagnostics.
+                text_error["_text_error"] = (
+                    "entry.encoding.unavailable: the extractor could not decode the source "
+                    f"using Encoding={encoding or 'Latin-1 (default)'!r}; "
+                    "normalized_raw is unavailable and the original bytes are retained"
+                )
+            raw = raw or ""
+            plain = plain or ""
+            # Legacy render/strip results have no UTF-8 guarantee. Never let an
+            # unsafe fallback override an explicitly unavailable projection.
+            rendered = ""
+        else:
+            # Older NDJSON v1 streams may omit both optional projections.
+            key = _text(record["key"], f"{context}.key", encoding)
+            raw = _text(record["raw"], f"{context}.raw", encoding)
+            rendered = (
+                _text(record["rendered_default"], f"{context}.rendered_default", encoding)
+                if record.get("rendered_default") is not None
+                else ""
+            )
+            plain = (
+                _text(record["stripped"], f"{context}.stripped", encoding)
+                if record.get("stripped") is not None
+                else ""
+            )
         scope = record.get("scope") or {}
         verse: dict[str, Any] = {}
         if scope.get("type") == "verse_key":
@@ -386,18 +475,11 @@ class GetBibleSwordContractReader:
             # Historical internal name: rendered_default can still be source
             # markup when the extractor has no display filter installed. Select
             # the public projection using SourceType, never this field's name.
-            "html": (
-                _text(rendered, f"record[{sequence}].rendered_default", encoding)
-                if rendered is not None
-                else ""
-            ),
-            "plain": (
-                _text(stripped, f"record[{sequence}].stripped", encoding)
-                if stripped is not None
-                else ""
-            ),
+            "html": rendered,
+            "plain": plain,
             "verse": verse,
             "_getbiblesword": record,
+            **text_error,
         }
 
     @staticmethod

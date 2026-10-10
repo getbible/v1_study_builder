@@ -35,7 +35,12 @@ consumer in `src/study_builder/contract.py` must continue to verify:
 - a supported header contract and `success: true` footer.
 
 Never use a `utf8` convenience field as the authoritative value. Decode `base64`,
-verify it, then create the public text projection. Unknown additive fields must be
+verify it, then create the public text projection. Prefer the optional
+`normalized_raw` and `normalized_stripped` byte envelopes from GetBible SWORD 0.4.0;
+validate them as strict UTF-8 without reapplying the source encoding or stripping
+U+FEFF. A nonnull normalized strip requires a nonnull normalized source. Continue
+validating the legacy byte envelopes and projection availability even when they are
+not used for display. Unknown additive fields must be
 retained in the internal source record. Validated entries remain disk-backed and
 writers stream them; do not restore whole-module entry or commentary collections in
 memory. Composed documents are streamed from the documents they embed, never built
@@ -94,8 +99,15 @@ named `html`) is not guaranteed to be HTML; it can still contain source markup.
 Never use that name to infer its format. These rules apply to dictionaries and
 commentaries alike; shared projection changes need both resources' smoke builds.
 Preserve source wording and scripts without per-entry replacements or language
-filters. Every text is normalised the same way. Module bytes UTF-8 cannot read are
-decoded as Windows-1252, never replaced. Public schemas and paths stay unchanged.
+filters. Every text is normalised the same way. An explicit null normalized source
+must not fall back to guessed decoding: retain its warning diagnostics, fail that
+module's display projection, and continue independent modules. A null normalized
+strip still permits source-aware rendering from valid normalized source. Never
+substitute unsafe legacy render/strip output for these new projections. The previous
+Windows-1252 compatibility decoder applies only to older streams omitting both
+normalized fields. SWORD keys have their own index/verse encoding, independent of
+the source body; do not apply SCSU or UTF-16 body decoding to those keys. Public
+schemas and paths stay unchanged.
 
 Dictionary Strong's keys remain compatible with Bible API v3 (`G3056`, `H0430`).
 Repeated dictionary keys retain the unsuffixed direct path for their first
