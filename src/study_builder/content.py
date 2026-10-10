@@ -491,6 +491,11 @@ class ContentProjectionError(ValueError):
 
 def public_content(entry: dict[str, Any], *, source_type: str = "") -> dict[str, str]:
     """Project a validated contract entry onto the unchanged v1 text-only shape."""
+    if error := entry.get("_text_error"):
+        raise ContentProjectionError(
+            f"Entry {entry.get('key', 'unknown')!r} "
+            f"({source_type or 'unspecified SourceType'}): {error}"
+        )
     projector = {"thml": thml_text, "tei": tei_text, "osis": osis_text}.get(
         source_type.strip().casefold()
     )

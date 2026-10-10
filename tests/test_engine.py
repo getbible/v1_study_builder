@@ -14,15 +14,24 @@ import pytest
 from study_builder.engine import EngineManifest, GetBibleSwordManager
 
 
-def test_manifest_pins_release_and_architectures(project_root: Path, monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("architecture", "sha256"),
+    [
+        ("x86_64", "58f8c1d1c0e23af0e121ce8ec192ab5d8d3da5fba9f832d7c678eceba5c7fbf5"),
+        ("arm64", "03476d274f09638653cb770b304483b57fb49532499a37765cce89fed9c4e968"),
+    ],
+)
+def test_manifest_pins_release_and_architectures(
+    project_root: Path, monkeypatch, architecture: str, sha256: str
+) -> None:
     manifest = EngineManifest.load(project_root / "conf/getbiblesword.json")
-    assert manifest.version == "0.1.1"
-    assert manifest.tag == "v0.1.1"
+    assert manifest.version == "0.4.0"
+    assert manifest.tag == "v0.4.0"
     monkeypatch.setattr("study_builder.engine.platform.system", lambda: "Linux")
-    monkeypatch.setattr("study_builder.engine.platform.machine", lambda: "x86_64")
+    monkeypatch.setattr("study_builder.engine.platform.machine", lambda: architecture)
     asset = manifest.platform_asset()
-    assert asset.name == "getbiblesword-0.1.1-linux-x86_64.tar.gz"
-    assert asset.sha256 == "ef8f698e77918be439a39973f6d3d2307951ec6054bee389f4f3ef0c148a063d"
+    assert asset.name == f"getbiblesword-0.4.0-linux-{architecture}.tar.gz"
+    assert asset.sha256 == sha256
 
 
 def test_release_asset_url_is_scoped_to_pinned_repository(
@@ -31,13 +40,13 @@ def test_release_asset_url_is_scoped_to_pinned_repository(
     manager = GetBibleSwordManager(project_root / "conf/getbiblesword.json", tmp_path)
     manager._validate_asset_url(
         "https://github.com/getbible/getbiblesword/releases/download/"
-        "v0.1.1/getbiblesword-0.1.1-linux-x86_64.tar.gz",
-        "getbiblesword-0.1.1-linux-x86_64.tar.gz",
+        "v0.4.0/getbiblesword-0.4.0-linux-x86_64.tar.gz",
+        "getbiblesword-0.4.0-linux-x86_64.tar.gz",
     )
     with pytest.raises(RuntimeError, match="outside github.com"):
         manager._validate_asset_url(
             "https://example.com/archive.tar.gz",
-            "getbiblesword-0.1.1-linux-x86_64.tar.gz",
+            "getbiblesword-0.4.0-linux-x86_64.tar.gz",
         )
 
 
@@ -72,7 +81,7 @@ def test_install_avoids_rate_limited_github_api(
         def download(self, url, target, expected_sha256=None, headers=None):
             self.urls.append(url)
             assert url.startswith(
-                "https://github.com/getbible/getbiblesword/releases/download/v0.1.1/"
+                "https://github.com/getbible/getbiblesword/releases/download/v0.4.0/"
             )
             assert "api.github.com" not in url
             assert expected_sha256 == archive_sha256

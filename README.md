@@ -37,7 +37,7 @@ same sources every other GetBible service reads.
 
 ## Extraction dependency
 
-`conf/getbiblesword.json` pins release `v0.1.1`, contract
+`conf/getbiblesword.json` pins release `v0.4.0`, contract
 `getbiblesword.ndjson/v1`, and the exact x86-64/ARM64 Linux asset names and
 SHA-256 digests. On first use the builder:
 
@@ -46,7 +46,7 @@ SHA-256 digests. On first use the builder:
 3. verifies it against the SHA-256 digest committed in the manifest;
 4. safely extracts only `usr/bin/getbiblesword`;
 5. checks the executable's reported version and contract;
-6. caches it under `.work/tools/getbiblesword/0.1.1/`.
+6. caches it under `.work/tools/getbiblesword/0.4.0/`.
 
 The `getbible/getbiblesword` repository and its pinned release are public, so
 installation requires no repository token or GitHub API request. The automated
@@ -99,13 +99,16 @@ and independently checks all of the rules that protect publication:
 - `getbiblesword.ndjson/v1` header and extract command;
 - canonical top-level member order and zero-based monotonic sequence values;
 - base64 decoding, byte size, SHA-256, and matching UTF-8 convenience fields;
+- strict UTF-8 in normalized projections and their source/strip relationship;
+- legacy projection availability and byte envelopes, even when not selected for display;
 - entry/configuration ordinals and module classification;
 - artifact identifiers, chunk indexes, reconstructed size, and SHA-256;
 - exact stream SHA-256 over every line before the footer, including LF;
 - exact footer record/entry/artifact/byte counts and `success: true`.
 
 Raw bytes remain authoritative. The adapter derives the public plain text only
-after verification and retains the original contract records internally.
+after verification and retains the original contract records internally, including
+legacy projections, official attributes, annotation segments, and additive fields.
 Validated entries are held in a compressed, disk-backed spool. Commentary entries
 are then normalized into disk-backed chapter buckets, collapsed so that a comment
 attached to a verse range is stored once rather than once per verse, and emitted in
@@ -324,12 +327,19 @@ clients that would otherwise read every word individually.
 
 ## Plain text
 
-Every document is plain text. For ThML, TEI, and OSIS modules, the builder projects the
-verified source markup into readable text. SWORD's stripped projections can discard
+Every document is plain text. GetBible SWORD 0.4.0 supplies `normalized_raw`, source
+markup strictly decoded to UTF-8, and `normalized_stripped`, SWORD's plain-text view
+of that source. The builder verifies each byte envelope and reads these projections
+as UTF-8 without reapplying the module's original encoding. The original source bytes
+remain in the validated record.
+
+For ThML, TEI, and OSIS modules, the builder projects the verified UTF-8 source markup
+into readable text. SWORD's stripped projections can discard
 line breaks and character references: a TEI `<lb/>` can disappear between words, and
 a Greek letter written as `&#x03B1;` can be lost. The source-aware projections preserve
 paragraphs, line breaks, senses, notes, reference labels, and Unicode characters for
-both dictionaries and commentaries. Other source formats retain SWORD's stripped text.
+both dictionaries and commentaries. Other source formats use the verified normalized
+stripped text.
 
 Character references are decoded once, when markup is read. Text that is already plain
 is only whitespace-normalised, so literal ampersands and entity-like examples are not
@@ -344,8 +354,17 @@ space between words, no leading or trailing space on a line, and at most one bla
 line between blocks. Standalone documents and the corresponding entries embedded in
 complete downloads contain identical text.
 
-Bytes the module wrote in Windows-1252 — the `’` of "David’s", the non-breaking space of
-"1 Chronicles" — are read as such rather than replaced with `�`.
+An explicitly unavailable `normalized_raw` is reported as a module failure after
+stream verification; the builder preserves its diagnostics and continues independent
+modules under the existing recovery policy. It does not guess another encoding.
+If only `normalized_stripped` is unavailable, the source-aware readers can still
+derive text from the intact source. Legacy render/strip output cannot override that
+decision. Older v1 streams omitting both normalized fields retain the previous decoder
+and its Windows-1252 compatibility behavior.
+
+SWORD index and verse keys are decoded independently of body encoding, so an SCSU or
+UTF-16 body does not change an ASCII or UTF-8 lookup key. Declared single-byte index
+keys remain supported. The upgrade adds no public fields or API version.
 
 ## Scripture references
 

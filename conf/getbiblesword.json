@@ -1,16 +1,16 @@
 {
   "repository": "getbible/getbiblesword",
-  "version": "0.1.1",
-  "tag": "v0.1.1",
+  "version": "0.4.0",
+  "tag": "v0.4.0",
   "contract": "getbiblesword.ndjson/v1",
   "assets": {
     "linux-x86_64": {
-      "name": "getbiblesword-0.1.1-linux-x86_64.tar.gz",
-      "sha256": "ef8f698e77918be439a39973f6d3d2307951ec6054bee389f4f3ef0c148a063d"
+      "name": "getbiblesword-0.4.0-linux-x86_64.tar.gz",
+      "sha256": "58f8c1d1c0e23af0e121ce8ec192ab5d8d3da5fba9f832d7c678eceba5c7fbf5"
     },
     "linux-arm64": {
-      "name": "getbiblesword-0.1.1-linux-arm64.tar.gz",
-      "sha256": "e90ab9afd69ff7d6204cf93121bfa6a22bd97d6a312a1e2cdb400e5ae89c821b"
+      "name": "getbiblesword-0.4.0-linux-arm64.tar.gz",
+      "sha256": "03476d274f09638653cb770b304483b57fb49532499a37765cce89fed9c4e968"
     }
   }
 }
