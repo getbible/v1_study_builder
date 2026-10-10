@@ -362,9 +362,11 @@ derive text from the intact source. Legacy render/strip output cannot override t
 decision. Older v1 streams omitting both normalized fields retain the previous decoder
 and its Windows-1252 compatibility behavior.
 
-SWORD index and verse keys are decoded independently of body encoding, so an SCSU or
-UTF-16 body does not change an ASCII or UTF-8 lookup key. Declared single-byte index
-keys remain supported. The upgrade adds no public fields or API version.
+The extractor does not normalize SWORD index or verse keys. The builder retains its
+existing key decoder for UTF-8 and single-byte modules, including legacy index bytes,
+to preserve published dictionary IDs and URLs. SCSU and UTF-16 body encodings are not
+applied to ASCII or UTF-8 lookup keys. This key compatibility rule does not affect the
+strict normalized source-body decoding. The upgrade adds no public fields or API version.
 
 ## Scripture references
 

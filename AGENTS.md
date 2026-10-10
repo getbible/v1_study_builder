@@ -106,7 +106,9 @@ strip still permits source-aware rendering from valid normalized source. Never
 substitute unsafe legacy render/strip output for these new projections. The previous
 Windows-1252 compatibility decoder applies only to older streams omitting both
 normalized fields. SWORD keys have their own index/verse encoding, independent of
-the source body; do not apply SCSU or UTF-16 body decoding to those keys. Public
+the source body. Retain the existing key compatibility decoder for UTF-8/single-byte
+modules so their IDs and URLs stay stable; do not apply SCSU or UTF-16 body decoding
+to those keys. This does not relax normalized source-body decoding. Public
 schemas and paths stay unchanged.
 
 Dictionary Strong's keys remain compatible with Bible API v3 (`G3056`, `H0430`).

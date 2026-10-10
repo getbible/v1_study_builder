@@ -157,23 +157,20 @@ def _normalized_entry_key(value: Any, context: str, encoding: str) -> str:
     """Read SWORD's index/verse key independently of the source-body encoding.
 
     SWORD generates verse keys and uses UTF-8 dictionary key operations even when
-    the body is SCSU or UTF-16. Older single-byte dictionary indexes also exist;
-    allow their declared codec, including SWORD's default Latin-1, explicitly.
-    The extractor preserves key bytes but does not normalize or label them.
+    the body is SCSU or UTF-16. The new extractor does not normalize keys, so keep
+    the existing key decoder for previously supported UTF-8/single-byte modules.
+    Real indexes such as Easton's contain legacy bytes despite declaring UTF-8;
+    changing their decoding would change existing dictionary IDs and URLs.
     """
     payload = decode_byte_value(value, context)
+    declared = encoding.strip().casefold().replace("_", "-")
+    if declared in _UTF8_ENCODINGS | _SINGLE_BYTE_ENCODINGS:
+        return decode_module_text(payload, encoding)
     try:
         return payload.decode("utf-8", errors="strict")
     except UnicodeDecodeError as error:
-        declared = encoding.strip().casefold().replace("_", "-")
-        if declared in _SINGLE_BYTE_ENCODINGS | {""}:
-            codec = "cp1252" if declared in {"cp1252", "windows-1252"} else "latin-1"
-            try:
-                return payload.decode(codec, errors="strict")
-            except UnicodeDecodeError:
-                pass
         raise ContractError(
-            f"{context} is not a supported UTF-8 or declared single-byte SWORD key; "
+            f"{context} is not a supported UTF-8 SWORD key; "
             f"the source-body encoding {encoding!r} cannot be applied to index keys"
         ) from error
 
